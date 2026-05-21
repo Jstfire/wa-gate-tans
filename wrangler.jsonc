@@ -1,0 +1,15 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "wa-gate-tans",
+  "compatibility_date": "2025-09-02",
+  "compatibility_flags": [
+    "nodejs_compat"
+  ],
+  "main": "@tanstack/solid-start/server-entry",
+  "routes": [
+    {
+      "pattern": "wa-gate.buseldata.com/*",
+      "zone_name": "buseldata.com"
+    }
+  ]
+}
