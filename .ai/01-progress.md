@@ -59,13 +59,17 @@
 ## Current Task
 - ✅ QA 4 tampilan — DONE
 - ✅ Deploy ke Cloudflare Workers — DONE
-- ⚠️ Push ke GitHub — BLOCKED (repo belum dibuat)
+- ✅ Push ke GitHub — DONE (`https://github.com/Jstfire/wa-gate-tans`)
 
 ## Blockers
 - ⚠️ Google Drive OAuth invalid_grant (perlu refresh token baru)
-- ⚠️ GitHub push: repo https://github.com/Jstfire/wa-gate-tans belum dibuat
-  → Buat manual di github.com/Jstfire/wa-gate-tans lalu jalankan:
-  → cd /mnt/c/laragon/www/wa-gate-tans && git push -u origin main
+
+## GitHub
+- Repository created via GitHub API: `https://github.com/Jstfire/wa-gate-tans`
+- Initial push required redacting secrets from `.ai` docs and pushing a clean orphan history because GitHub Push Protection blocked old commits containing Cloudflare/Google OAuth secrets.
+- Current branch: `main`
+- Latest clean commit: `58d4cbd feat: WA Gate BPS Buton Selatan - full-stack build (secrets redacted)`
+- Remote URL sanitized after push: `https://github.com/Jstfire/wa-gate-tans.git`.
 
 ## Files Structure
 ```
