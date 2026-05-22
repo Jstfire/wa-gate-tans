@@ -41,8 +41,8 @@ function envValue(env: RuntimeEnv | undefined, key: string): string {
 }
 
 function runtimeConfig(env?: RuntimeEnv): { urls: string[]; key: string } {
-  const primary = envValue(env, 'WA_RUNTIME_PRIMARY_URL').replace(/\/+$/, '') || envValue(env, 'WA_RUNTIME_URL').replace(/\/+$/, '') || ''
-  const backup = envValue(env, 'WA_RUNTIME_BACKUP_URL').replace(/\/+$/, '') || ''
+  const primary = envValue(env, 'WA_RUNTIME_PRIMARY_URL').replace(/\/+$/, '') || 'https://wa-runtime.buseldata.com'
+  const backup = envValue(env, 'WA_RUNTIME_BACKUP_URL').replace(/\/+$/, '') || envValue(env, 'WA_RUNTIME_URL').replace(/\/+$/, '') || ''
   const urls = [primary, backup].filter((url, index, arr): url is string => Boolean(url) && arr.indexOf(url) === index)
   const key = envValue(env, 'WA_RUNTIME_API_KEY')
   if (urls.length === 0 || !key) throw new Error('WA runtime is not configured')
