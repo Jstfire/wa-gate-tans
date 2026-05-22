@@ -55,7 +55,8 @@ async function runtimeFetchFrom<T>(url: string, key: string, path: string, init:
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), timeoutMs)
   try {
-    const response = await fetch(`${url}${path}`, { ...init, headers, signal: controller.signal })
+    const endpoint = path.includes('?') ? `${url}${path}&_=${Date.now()}` : `${url}${path}?_=${Date.now()}`
+    const response = await fetch(endpoint, { ...init, headers, signal: controller.signal })
     const text = await response.text()
     const data = text ? (JSON.parse(text) as T) : ({} as T)
     if (!response.ok) {
