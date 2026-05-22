@@ -76,7 +76,7 @@ function DashboardPage() {
             <MiniMetric label="Inbox hari ini" value={loading() ? '...' : stats().messagesToday} />
             <MiniMetric label="Template aktif" value={loading() ? '...' : stats().templates} />
             <MiniMetric label="Blast aktif" value={loading() ? '...' : stats().activeBlast} />
-            <MiniMetric label="Mode" value="Primary/Backup" />
+            <MiniMetric label="Mode" value="Failover" />
           </div>
         </div>
       </section>

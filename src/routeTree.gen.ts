@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as LoginRouteImport } from './routes/login'
+import { Route as InboxLiveRouteImport } from './routes/inbox-live'
 import { Route as AppRouteImport } from './routes/_app'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AppWaConnectionRouteImport } from './routes/_app/wa-connection'
@@ -27,6 +28,11 @@ import { Route as AppApiKeysRouteImport } from './routes/_app/api-keys'
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
   path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const InboxLiveRoute = InboxLiveRouteImport.update({
+  id: '/inbox-live',
+  path: '/inbox-live',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AppRoute = AppRouteImport.update({
@@ -96,6 +102,7 @@ const AppApiKeysRoute = AppApiKeysRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/inbox-live': typeof InboxLiveRoute
   '/login': typeof LoginRoute
   '/api-keys': typeof AppApiKeysRoute
   '/blast': typeof AppBlastRoute
@@ -111,6 +118,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/inbox-live': typeof InboxLiveRoute
   '/login': typeof LoginRoute
   '/api-keys': typeof AppApiKeysRoute
   '/blast': typeof AppBlastRoute
@@ -128,6 +136,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/_app': typeof AppRouteWithChildren
+  '/inbox-live': typeof InboxLiveRoute
   '/login': typeof LoginRoute
   '/_app/api-keys': typeof AppApiKeysRoute
   '/_app/blast': typeof AppBlastRoute
@@ -145,6 +154,7 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/inbox-live'
     | '/login'
     | '/api-keys'
     | '/blast'
@@ -160,6 +170,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/inbox-live'
     | '/login'
     | '/api-keys'
     | '/blast'
@@ -176,6 +187,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/_app'
+    | '/inbox-live'
     | '/login'
     | '/_app/api-keys'
     | '/_app/blast'
@@ -193,6 +205,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AppRoute: typeof AppRouteWithChildren
+  InboxLiveRoute: typeof InboxLiveRoute
   LoginRoute: typeof LoginRoute
 }
 
@@ -203,6 +216,13 @@ declare module '@tanstack/solid-router' {
       path: '/login'
       fullPath: '/login'
       preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/inbox-live': {
+      id: '/inbox-live'
+      path: '/inbox-live'
+      fullPath: '/inbox-live'
+      preLoaderRoute: typeof InboxLiveRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_app': {
@@ -332,6 +352,7 @@ const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AppRoute: AppRouteWithChildren,
+  InboxLiveRoute: InboxLiveRoute,
   LoginRoute: LoginRoute,
 }
 export const routeTree = rootRouteImport
