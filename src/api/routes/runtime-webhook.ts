@@ -5,7 +5,7 @@ import { sendViaRuntime } from './wa-runtime'
 type JsonValue = string | number | boolean | null | JsonValue[] | { [key: string]: JsonValue }
 type JsonObject = { [key: string]: JsonValue }
 
-interface IncomingPayload { from?: unknown; to?: unknown; body?: unknown; messageId?: unknown }
+interface IncomingPayload { from?: unknown; to?: unknown; body?: unknown; messageId?: unknown; contactNumber?: unknown; contactName?: unknown }
 interface MessageRow { id: string; from_number: string; to_number: string; content: string; direction: string; status: string; wa_message_id: string | null; created_at: string }
 interface ContactRow { id: string; phone_number: string; name: string | null; metadata: JsonValue; has_chat_history: boolean }
 interface TemplateRow { name: string; content: string; is_active: boolean }
@@ -15,7 +15,11 @@ interface SessionMeta extends JsonObject { level: string | null; adminMode: bool
 const runtimeWebhook = new Hono()
 
 function isAuthorized(header: string | undefined): boolean { const key = process.env.WA_RUNTIME_API_KEY ?? ''; return Boolean(key) && header === `Bearer ${key}` }
-function phoneFromChatId(value: string): string { return value.replace(/@c\.us$|@g\.us$/g, '') }
+function phoneFromChatId(value: string): string { return value.replace(/@c\.us$|@g\.us$|@lid$/g, '') }
+function inboundPhone(body: IncomingPayload): string {
+  if (typeof body.contactNumber === 'string' && body.contactNumber.trim()) return phoneFromChatId(body.contactNumber)
+  return typeof body.from === 'string' ? phoneFromChatId(body.from) : 'unknown'
+}
 function metadataObject(value: JsonValue): JsonObject { return value && typeof value === 'object' && !Array.isArray(value) ? value : {} }
 function metaOf(row: ContactRow | null): SessionMeta {
   const raw = metadataObject(row?.metadata ?? null)
@@ -92,11 +96,15 @@ runtimeWebhook.post('/incoming', async (c) => {
   if (!isAuthorized(c.req.header('Authorization'))) return c.json({ error: 'Unauthorized' }, 401)
   const body = await c.req.json<IncomingPayload>()
   if (typeof body.from !== 'string' || typeof body.body !== 'string') return c.json({ error: 'Invalid payload' }, 400)
-  const from = phoneFromChatId(body.from), to = typeof body.to === 'string' ? phoneFromChatId(body.to) : (process.env.WA_NUMBER ?? 'system'), text = body.body.trim()
+  const from = inboundPhone(body), to = typeof body.to === 'string' ? phoneFromChatId(body.to) : (process.env.WA_NUMBER ?? 'system'), text = body.body.trim()
   if (!text) return c.json({ ok: true, skipped: 'empty' })
   const client = getWagateClient()
   await client.insert<MessageRow>('messages_wagate', { wa_message_id: typeof body.messageId === 'string' ? body.messageId : `in_${crypto.randomUUID()}`, from_number: from, to_number: to, content: text, message_type: 'text', direction: 'inbound', status: 'received' })
-  await handleBot(from, text)
+  try {
+    await handleBot(from, text)
+  } catch (error) {
+    return c.json({ ok: true, botError: error instanceof Error ? error.message : String(error) })
+  }
   return c.json({ ok: true })
 })
 

@@ -118,6 +118,7 @@ async function forwardIncomingMessage(message: WaMessage): Promise<void> {
   if (message.fromMe || !message.body.trim()) return
 
   try {
+    const contact = await message.getContact().catch(() => null)
     const response = await fetch(`${config.corsOrigin}/api/runtime/incoming`, {
       method: 'POST',
       headers: {
@@ -130,6 +131,8 @@ async function forwardIncomingMessage(message: WaMessage): Promise<void> {
         body: message.body,
         messageId: message.id.id,
         timestamp: message.timestamp,
+        contactNumber: contact?.number ?? null,
+        contactName: contact?.pushname ?? contact?.name ?? null,
       }),
     })
     if (!response.ok) {
