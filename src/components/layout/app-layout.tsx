@@ -40,7 +40,7 @@ export const AppLayout: ParentComponent = (props) => {
         {/* Sidebar — hidden on mobile unless open */}
         <div
           class={[
-            'fixed inset-y-0 left-0 z-30 md:relative md:flex',
+            'fixed inset-y-0 left-0 z-30 md:static md:flex',
             mobileOpen() ? 'flex' : 'hidden md:flex',
           ].join(' ')}
         >
