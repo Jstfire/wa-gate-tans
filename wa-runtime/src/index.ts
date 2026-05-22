@@ -205,7 +205,12 @@ async function startClient(): Promise<void> {
     console.log('[WA-RUNTIME] Incoming message', JSON.stringify({ from: message.from, type: message.type, hasBody: message.body.length > 0 }))
   })
 
-  await client.initialize()
+  void client.initialize().catch((err: unknown) => {
+    state.lastError = err instanceof Error ? err.message : 'WA client initialization failed'
+    touch('error')
+    console.error('[WA-RUNTIME] Initialize failed:', state.lastError)
+    client = null
+  })
 }
 
 function scheduleReconnect(): void {
