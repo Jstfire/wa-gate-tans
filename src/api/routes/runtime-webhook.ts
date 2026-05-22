@@ -8,11 +8,38 @@ type JsonObject = { [key: string]: JsonValue }
 interface IncomingPayload { from?: unknown; to?: unknown; body?: unknown; messageId?: unknown; contactNumber?: unknown; contactName?: unknown }
 interface MessageRow { id: string; from_number: string; to_number: string; content: string; direction: string; status: string; wa_message_id: string | null; created_at: string }
 interface ContactRow { id: string; phone_number: string; name: string | null; metadata: JsonValue; has_chat_history: boolean }
+interface WaAccountRow { id: string; phone_number: string | null; name: string | null; status: string; session_data: JsonValue; created_at: string }
 interface TemplateRow { name: string; content: string; is_active: boolean }
 interface ChatbotRuleRow { id: string; trigger: string; parent_trigger: string | null; response_type: string; response_content: string; response_metadata: JsonValue; order: number; is_active: boolean }
 interface SessionMeta extends JsonObject { level: string | null; adminMode: boolean; lastWelcomeAt: string | null }
 
 const runtimeWebhook = new Hono()
+
+runtimeWebhook.get('/session', async (c) => {
+  if (!isAuthorized(c.req.header('Authorization'))) return c.json({ error: 'Unauthorized' }, 401)
+  const account = await getWagateClient().selectOne<WaAccountRow>('wa_accounts_wagate', { order: 'updated_at.desc' })
+  const data = metadataObject(account?.session_data ?? null)
+  return c.json({ archiveBase64: typeof data.archiveBase64 === 'string' ? data.archiveBase64 : null })
+})
+
+runtimeWebhook.post('/session', async (c) => {
+  if (!isAuthorized(c.req.header('Authorization'))) return c.json({ error: 'Unauthorized' }, 401)
+  const body = await c.req.json<{ archiveBase64?: unknown; phoneNumber?: unknown; name?: unknown }>()
+  if (typeof body.archiveBase64 !== 'string' || body.archiveBase64.length < 100) return c.json({ error: 'Invalid session archive' }, 400)
+  const client = getWagateClient()
+  const existing = await client.selectOne<WaAccountRow>('wa_accounts_wagate', { order: 'created_at.asc' })
+  const payload: Record<string, JsonValue> = {
+    phone_number: typeof body.phoneNumber === 'string' ? body.phoneNumber : existing?.phone_number ?? null,
+    name: typeof body.name === 'string' ? body.name : existing?.name ?? null,
+    status: 'connected',
+    session_data: { archiveBase64: body.archiveBase64, backedUpAt: new Date().toISOString() },
+    last_connected_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  }
+  if (existing) await client.update<WaAccountRow>('wa_accounts_wagate', payload, { id: `eq.${existing.id}` })
+  else await client.insert<WaAccountRow>('wa_accounts_wagate', payload)
+  return c.json({ ok: true })
+})
 
 function isAuthorized(header: string | undefined): boolean { const key = process.env.WA_RUNTIME_API_KEY ?? ''; return Boolean(key) && header === `Bearer ${key}` }
 function phoneFromChatId(value: string): string { return value.replace(/@c\.us$|@g\.us$|@lid$/g, '') }

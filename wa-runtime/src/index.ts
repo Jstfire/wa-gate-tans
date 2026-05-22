@@ -1,4 +1,8 @@
 import { serve } from '@hono/node-server'
+import { execFile } from 'node:child_process'
+import { existsSync } from 'node:fs'
+import { mkdir, readFile, rm, writeFile } from 'node:fs/promises'
+import { promisify } from 'node:util'
 import { Hono } from 'hono'
 import { cors } from 'hono/cors'
 import { z } from 'zod'
@@ -37,6 +41,8 @@ type SendResult = {
   microDelayMs: number
 }
 
+const execFileAsync = promisify(execFile)
+const SESSION_ARCHIVE = '/tmp/wagate-session.tar.gz'
 const config = loadConfig()
 const state: RuntimeState = {
   status: 'disconnected',
@@ -81,6 +87,18 @@ function touch(status: WaStatus): void {
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+async function withTimeout<T>(promise: Promise<T>, timeoutMs: number, label: string): Promise<T> {
+  let timeoutId: ReturnType<typeof setTimeout> | null = null
+  const timeout = new Promise<never>((_, reject) => {
+    timeoutId = setTimeout(() => reject(new Error(`${label} timeout after ${timeoutMs / 1000}s`)), timeoutMs)
+  })
+  try {
+    return await Promise.race([promise, timeout])
+  } finally {
+    if (timeoutId) clearTimeout(timeoutId)
+  }
 }
 
 function calculateTypingMs(messageLength: number): number {
@@ -143,11 +161,47 @@ async function forwardIncomingMessage(message: WaMessage): Promise<void> {
   }
 }
 
+async function restoreSessionFromGate(): Promise<void> {
+  if (existsSync(config.authDataPath)) return
+  try {
+    const response = await fetch(`${config.corsOrigin}/api/runtime/session`, { headers: { Authorization: `Bearer ${config.apiKey}` } })
+    if (!response.ok) return
+    const data = await response.json() as { archiveBase64?: string | null }
+    if (!data.archiveBase64) return
+    await mkdir(config.authDataPath, { recursive: true })
+    await mkdir(config.cachePath, { recursive: true })
+    await writeFile(SESSION_ARCHIVE, Buffer.from(data.archiveBase64, 'base64'))
+    await execFileAsync('tar', ['-xzf', SESSION_ARCHIVE, '-C', '/'])
+    console.log('[WA-RUNTIME] Session restored from WA Gate DB')
+  } catch (err: unknown) {
+    console.warn('[WA-RUNTIME] Session restore skipped:', err instanceof Error ? err.message : String(err))
+  }
+}
+
+async function backupSessionToGate(): Promise<void> {
+  if (!existsSync(config.authDataPath)) return
+  try {
+    await rm(SESSION_ARCHIVE, { force: true })
+    await execFileAsync('tar', ['-czf', SESSION_ARCHIVE, config.authDataPath.replace(/^\//, ''), config.cachePath.replace(/^\//, '')], { cwd: '/' })
+    const archiveBase64 = (await readFile(SESSION_ARCHIVE)).toString('base64')
+    const account = getInfo()
+    const response = await fetch(`${config.corsOrigin}/api/runtime/session`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${config.apiKey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ archiveBase64, phoneNumber: account?.wid?.user ?? null, name: account?.pushname ?? null }),
+    })
+    if (!response.ok) console.warn('[WA-RUNTIME] Session backup failed:', response.status, await response.text())
+    else console.log('[WA-RUNTIME] Session backed up to WA Gate DB')
+  } catch (err: unknown) {
+    console.warn('[WA-RUNTIME] Session backup skipped:', err instanceof Error ? err.message : String(err))
+  }
+}
+
 async function ensureClient(): Promise<void> {
   if (client && state.status !== 'error') return
   if (initializing) return initializing
 
-  initializing = startClient().finally(() => {
+  initializing = (async () => { await restoreSessionFromGate(); await startClient() })().finally(() => {
     initializing = null
   })
   return initializing
@@ -203,12 +257,14 @@ async function startClient(): Promise<void> {
     state.reconnectAttempts = 0
     touch('connected')
     console.log('[WA-RUNTIME] Client ready')
+    setTimeout(() => { void backupSessionToGate() }, 5000)
   })
 
   client.on('authenticated', () => {
     state.qrRaw = null
     touch('authenticated')
     console.log('[WA-RUNTIME] Authenticated')
+    setTimeout(() => { void backupSessionToGate() }, 10000)
   })
 
   client.on('auth_failure', (message: string) => {
@@ -259,19 +315,20 @@ async function sendHumanLike(to: string, message: string, simulateTyping: boolea
   let microDelayMs = 0
 
   if (simulateTyping) {
-    const chat = await client.getChatById(chatId)
-    typingMs = calculateTypingMs(message.length)
+    const chat = await withTimeout(client.getChatById(chatId), 8_000, 'getChatById')
+    typingMs = Math.min(calculateTypingMs(message.length), 8_000)
+    await withTimeout(chat.sendStateTyping(), 5_000, 'sendStateTyping')
     try {
-      await chat.sendStateTyping()
       await sleep(typingMs)
     } finally {
-      await chat.clearState()
+      await withTimeout(chat.clearState().catch(() => undefined), 5_000, 'clearState').catch(() => undefined)
     }
-    microDelayMs = Math.floor(1000 + Math.random() * 2000)
+    microDelayMs = 500 + Math.round(Math.random() * 1000)
     await sleep(microDelayMs)
   }
 
-  const sent = await client.sendMessage(chatId, message)
+  const sent = await withTimeout(client.sendMessage(chatId, message), 25_000, 'sendMessage')
+
   return {
     chatId,
     messageId: sent?.id?.id ?? null,
