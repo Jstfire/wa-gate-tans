@@ -50,7 +50,7 @@ async function runtimeFetch<T>(path: string, init: RequestInit = {}): Promise<T>
   headers.set('Accept', 'application/json')
 
   const controller = new AbortController()
-  const timeoutMs = path === '/api/qr' ? 12_000 : 8_000
+  const timeoutMs = path === '/api/send' ? 45_000 : path === '/api/qr' ? 12_000 : 8_000
   const timeout = setTimeout(() => controller.abort(), timeoutMs)
 
   try {
