@@ -42,6 +42,7 @@ bunx wrangler deploy
 ### Known deployment notes
 - Cloudflare had a temporary `entitlements.not_available [code: 10007]` outage earlier; later deploys succeeded.
 - Background retry process `proc_8880f83ef62e` printed `DEPLOY SUCCESS`, but it was from an older loop and later deployments superseded it.
+- Background retry process `proc_53a129eee116` later completed with exit code `-15` because it was killed after successful manual deploys; it is obsolete and does not indicate current deployment failure.
 
 ### Remaining deployment work
 - Continue live QA mobile light/dark.
