@@ -250,7 +250,7 @@ function scheduleReconnect(): void {
 }
 
 async function sendHumanLike(to: string, message: string, simulateTyping: boolean): Promise<SendResult> {
-  if (!client || state.status !== 'connected') {
+  if (!client || (state.status !== 'connected' && state.status !== 'authenticated')) {
     throw new Error('WA client is not connected')
   }
 
