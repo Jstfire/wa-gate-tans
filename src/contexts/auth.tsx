@@ -53,16 +53,32 @@ export function AuthProvider(props: { children: JSX.Element }) {
   const login = async (username: string, password: string) => {
     const res = await fetch('/api/auth/login', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
       body: JSON.stringify({ username, password }),
     })
-    if (!res.ok) {
-      const err = (await res.json()) as { error?: string }
-      throw new Error(err.error ?? 'Login failed')
+    const contentType = res.headers.get('content-type') ?? ''
+    const bodyText = await res.text()
+    let payload: { token?: string; user?: AuthUser; error?: string } = {}
+
+    if (contentType.includes('application/json')) {
+      try {
+        payload = JSON.parse(bodyText) as { token?: string; user?: AuthUser; error?: string }
+      } catch {
+        payload = { error: 'Login response is not valid JSON' }
+      }
+    } else {
+      payload = { error: `Login endpoint returned ${res.status} ${res.statusText || 'non-JSON response'}` }
     }
-    const data = (await res.json()) as { token: string; user: AuthUser }
-    localStorage.setItem('wa-gate-token', data.token)
-    setUser(data.user)
+
+    if (!res.ok) {
+      throw new Error(payload.error ?? 'Login failed')
+    }
+    if (!payload.token || !payload.user) {
+      throw new Error(payload.error ?? 'Login response missing token or user')
+    }
+
+    localStorage.setItem('wa-gate-token', payload.token)
+    setUser(payload.user)
   }
 
   const logout = async () => {
