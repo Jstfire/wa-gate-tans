@@ -146,11 +146,21 @@ function WaConnectionPage() {
         const result = await fetchJson<RuntimeQr>(`/api/wa/qr/refresh/${kind}`, { method: 'POST' })
         setQrList((current) => [...current.filter((item) => item.kind !== kind), result])
       } else {
-        const [primary, backup] = await Promise.all([
+        const results = await Promise.allSettled([
           fetchJson<RuntimeQr>('/api/wa/qr/refresh/primary', { method: 'POST' }),
           fetchJson<RuntimeQr>('/api/wa/qr/refresh/backup', { method: 'POST' }),
         ])
-        setQrList([primary, backup])
+        const fulfilled = results
+          .filter((item): item is PromiseFulfilledResult<RuntimeQr> => item.status === 'fulfilled')
+          .map((item) => item.value)
+        if (fulfilled.length > 0) {
+          setQrList((current) => [
+            ...current.filter((item) => !fulfilled.some((fresh) => fresh.kind === item.kind)),
+            ...fulfilled,
+          ])
+        }
+        const rejected = results.find((item): item is PromiseRejectedResult => item.status === 'rejected')
+        if (rejected && fulfilled.length === 0) throw rejected.reason
       }
       await refreshStatus()
     } finally {
