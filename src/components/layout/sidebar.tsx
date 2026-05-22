@@ -45,7 +45,7 @@ export function Sidebar(props: SidebarProps) {
   return (
     <aside
       class={cn(
-        'm-3 mr-0 flex h-[calc(100%-1.5rem)] flex-col rounded-[1.35rem] border border-slate-200 bg-white text-slate-900 shadow-xl shadow-slate-200/60 transition-all duration-300 dark:border-slate-800 dark:bg-[#111b21] dark:text-slate-100 dark:shadow-black/30',
+        'flex h-screen flex-col border-r border-slate-200 bg-white text-slate-900 shadow-sm shadow-slate-200/40 transition-all duration-300 dark:border-slate-800 dark:bg-[#111b21] dark:text-slate-100 dark:shadow-black/20',
         props.collapsed ? 'w-[72px]' : 'w-[272px]',
       )}
     >
