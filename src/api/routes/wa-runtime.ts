@@ -48,14 +48,28 @@ async function runtimeFetch<T>(path: string, init: RequestInit = {}): Promise<T>
   const headers = new Headers(init.headers)
   headers.set('Authorization', `Bearer ${key}`)
   headers.set('Accept', 'application/json')
-  const response = await fetch(`${url}${path}`, { ...init, headers })
-  const text = await response.text()
-  const data = text ? (JSON.parse(text) as T) : ({} as T)
-  if (!response.ok) {
-    const message = typeof data === 'object' && data && 'error' in data ? String((data as { error?: unknown }).error) : 'WA runtime request failed'
-    throw new Error(message)
+
+  const controller = new AbortController()
+  const timeoutMs = path === '/api/qr' ? 12_000 : 8_000
+  const timeout = setTimeout(() => controller.abort(), timeoutMs)
+
+  try {
+    const response = await fetch(`${url}${path}`, { ...init, headers, signal: controller.signal })
+    const text = await response.text()
+    const data = text ? (JSON.parse(text) as T) : ({} as T)
+    if (!response.ok) {
+      const message = typeof data === 'object' && data && 'error' in data ? String((data as { error?: unknown }).error) : 'WA runtime request failed'
+      throw new Error(message)
+    }
+    return data
+  } catch (error) {
+    if (error instanceof DOMException && error.name === 'AbortError') {
+      throw new Error(`WA runtime timeout after ${timeoutMs / 1000}s`)
+    }
+    throw error
+  } finally {
+    clearTimeout(timeout)
   }
-  return data
 }
 
 waRuntime.get('/status', requirePermission('wa_connect'), async (c) => {

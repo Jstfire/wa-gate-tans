@@ -16,37 +16,53 @@ function fetchWithAuth(url: string) {
   })
 }
 
+function shouldFetchQr(data: Record<string, unknown>): boolean {
+  return data.status !== 'connected' && data.hasQr === true
+}
+
 function WaConnectionPage() {
   const [connecting, setConnecting] = createSignal(false)
+  const [refreshingQr, setRefreshingQr] = createSignal(false)
   const [statusData, setStatusData] = createSignal<Record<string, unknown> | null>(null)
   const [qrData, setQrData] = createSignal<Record<string, unknown> | null>(null)
 
-  const refreshStatus = async () => {
+  const refreshStatus = async (options: { includeQr?: boolean } = {}) => {
     try {
       const data = await fetchWithAuth('/api/wa/status')
       setStatusData(data)
-      if (data.status === 'connecting' || data.status === 'qr_pending' || data.hasQr === true) {
+
+      if (data.status === 'connected') {
+        setQrData(null)
+        return
+      }
+
+      if (options.includeQr && shouldFetchQr(data)) {
         const qr = await fetchWithAuth('/api/wa/qr')
         setQrData(qr)
-      } else {
-        setQrData(null)
       }
     } catch {
       setStatusData({ status: 'unknown' })
     }
   }
 
+  const refreshQr = async () => {
+    setRefreshingQr(true)
+    try {
+      await refreshStatus({ includeQr: true })
+    } finally {
+      setRefreshingQr(false)
+    }
+  }
+
   onMount(() => {
-    refreshStatus()
-    const interval = window.setInterval(refreshStatus, 5000)
-    return () => window.clearInterval(interval)
+    void refreshStatus({ includeQr: true })
   })
 
   const handleConnect = async () => {
     setConnecting(true)
     try {
       await fetch('/api/wa/connect', { method: 'POST', headers: authHeader() })
-      await refreshStatus()
+      await refreshStatus({ includeQr: true })
     } finally {
       setConnecting(false)
     }
@@ -54,7 +70,7 @@ function WaConnectionPage() {
 
   const handleDisconnect = async () => {
     await fetch('/api/wa/disconnect', { method: 'POST', headers: authHeader() })
-    await refreshStatus()
+    await refreshStatus({ includeQr: true })
   }
 
   const status = () => (statusData()?.status as string) ?? 'unknown'
@@ -86,13 +102,17 @@ function WaConnectionPage() {
             <div class="flex flex-col items-center gap-3 rounded-lg border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-800">
               <p class="text-sm text-gray-600 dark:text-gray-400">Scan QR code with WhatsApp</p>
               <img src={qrData()?.qr as string} alt="QR Code" class="h-64 w-64" />
+              <p class="text-center text-xs text-gray-500 dark:text-gray-400">QR hanya diambil saat halaman ini dibuka atau tombol refresh ditekan.</p>
             </div>
           </Show>
 
-          <div class="flex gap-3">
+          <div class="flex flex-wrap gap-3">
             <Show when={status() !== 'connected'}>
               <Button onClick={handleConnect} disabled={connecting() || status() === 'connecting' || status() === 'initializing'}>
                 {connecting() ? 'Connecting...' : 'Connect'}
+              </Button>
+              <Button variant="outline" onClick={refreshQr} disabled={refreshingQr() || status() === 'connected'}>
+                {refreshingQr() ? 'Refreshing...' : 'Refresh QR'}
               </Button>
             </Show>
             <Show when={status() === 'connected'}>
