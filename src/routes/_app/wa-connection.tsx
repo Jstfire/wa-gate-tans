@@ -168,11 +168,24 @@ function WaConnectionPage() {
     }
   }
 
+  const fetchCurrentQr = async () => {
+    try {
+      const results = await Promise.allSettled([
+        fetchJson<RuntimeQr>('/api/wa/qr/by/primary'),
+        fetchJson<RuntimeQr>('/api/wa/qr/by/backup'),
+      ])
+      const fulfilled = results
+        .filter((item): item is PromiseFulfilledResult<RuntimeQr> => item.status === 'fulfilled')
+        .map((item) => item.value)
+      if (fulfilled.length > 0) setQrList(fulfilled)
+    } catch { /* silent */ }
+  }
+
   const qrFor = (kind: RuntimeKind) => qrList().find((item) => item.kind === kind)
 
   onMount(() => {
     void refreshStatus()
-    void refreshQr()
+    void fetchCurrentQr()
     const id = window.setInterval(() => void refreshStatus(), 5000)
     onCleanup(() => window.clearInterval(id))
   })
