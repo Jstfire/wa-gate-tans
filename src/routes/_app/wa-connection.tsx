@@ -1,6 +1,5 @@
 import { createFileRoute } from '@tanstack/solid-router'
-import { createSignal, Show } from 'solid-js'
-import { createQuery } from '@tanstack/solid-query'
+import { createSignal, Show, onMount } from 'solid-js'
 import { Card, CardContent, CardHeader } from '../../components/ui/card'
 import { Badge } from '../../components/ui/badge'
 import { Button } from '../../components/ui/button'
@@ -19,25 +18,33 @@ function fetchWithAuth(url: string) {
 
 function WaConnectionPage() {
   const [connecting, setConnecting] = createSignal(false)
+  const [statusData, setStatusData] = createSignal<Record<string, unknown> | null>(null)
+  const [qrData, setQrData] = createSignal<Record<string, unknown> | null>(null)
 
-  const statusQuery = createQuery(() => ({
-    queryKey: ['wa-status'],
-    queryFn: () => fetchWithAuth('/api/wa/status'),
-    refetchInterval: 5000,
-  }))
+  const refreshStatus = async () => {
+    try {
+      const data = await fetchWithAuth('/api/wa/status')
+      setStatusData(data)
+      if (data.status === 'connecting') {
+        const qr = await fetchWithAuth('/api/wa/qr')
+        setQrData(qr)
+      }
+    } catch {
+      setStatusData({ status: 'unknown' })
+    }
+  }
 
-  const qrQuery = createQuery(() => ({
-    queryKey: ['wa-qr'],
-    queryFn: () => fetchWithAuth('/api/wa/qr'),
-    refetchInterval: 3000,
-    enabled: statusQuery.data?.status === 'connecting',
-  }))
+  onMount(() => {
+    refreshStatus()
+    const interval = window.setInterval(refreshStatus, 5000)
+    return () => window.clearInterval(interval)
+  })
 
   const handleConnect = async () => {
     setConnecting(true)
     try {
       await fetch('/api/wa/connect', { method: 'POST', headers: authHeader() })
-      statusQuery.refetch()
+      await refreshStatus()
     } finally {
       setConnecting(false)
     }
@@ -45,10 +52,10 @@ function WaConnectionPage() {
 
   const handleDisconnect = async () => {
     await fetch('/api/wa/disconnect', { method: 'POST', headers: authHeader() })
-    statusQuery.refetch()
+    await refreshStatus()
   }
 
-  const status = () => (statusQuery.data?.status as string) ?? 'unknown'
+  const status = () => (statusData()?.status as string) ?? 'unknown'
 
   return (
     <div class="flex flex-col gap-6">
@@ -67,16 +74,16 @@ function WaConnectionPage() {
           </div>
         </CardHeader>
         <CardContent class="flex flex-col gap-4">
-          <Show when={statusQuery.data?.phoneNumber}>
+          <Show when={statusData()?.phoneNumber}>
             <p class="text-sm text-gray-600 dark:text-gray-400">
-              Connected as: <span class="font-medium text-gray-900 dark:text-white">{statusQuery.data?.phoneNumber as string}</span>
+              Connected as: <span class="font-medium text-gray-900 dark:text-white">{statusData()?.phoneNumber as string}</span>
             </p>
           </Show>
 
-          <Show when={status() === 'connecting' && qrQuery.data?.qrCode}>
+          <Show when={status() === 'connecting' && qrData()?.qrCode}>
             <div class="flex flex-col items-center gap-3 rounded-lg border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-800">
               <p class="text-sm text-gray-600 dark:text-gray-400">Scan QR code with WhatsApp</p>
-              <img src={`data:image/png;base64,${qrQuery.data?.qrCode as string}`} alt="QR Code" class="h-64 w-64" />
+              <img src={`data:image/png;base64,${qrData()?.qrCode as string}`} alt="QR Code" class="h-64 w-64" />
             </div>
           </Show>
 

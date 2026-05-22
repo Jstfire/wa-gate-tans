@@ -45,6 +45,7 @@ function ChatbotPage() {
 
   const query = createQuery(() => ({
     queryKey: ['chatbot-rules'],
+    enabled: typeof window !== 'undefined',
     queryFn: async () => {
       const res = await fetch('/api/chatbot/rules', { headers: authHeader() })
       if (!res.ok) throw new Error('Failed to fetch')

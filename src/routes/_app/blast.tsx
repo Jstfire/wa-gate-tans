@@ -54,6 +54,7 @@ function BlastPage() {
 
   const jobsQuery = createQuery(() => ({
     queryKey: ['blast-jobs'],
+    enabled: typeof window !== 'undefined',
     queryFn: () => fetchJson<BlastJob[]>('/api/blast'),
     refetchInterval: 8000,
   }))

@@ -75,17 +75,17 @@ const IconCog = () => (
 )
 
 const navItems: NavItem[] = [
-  { label: 'Dashboard', href: '/_app/dashboard', icon: <IconHome /> },
-  { label: 'WA Connection', href: '/_app/wa-connection', icon: <IconPhone /> },
-  { label: 'Inbox', href: '/_app/inbox', icon: <IconChat /> },
-  { label: 'Templates', href: '/_app/templates', icon: <IconDocument /> },
-  { label: 'Chatbot Rules', href: '/_app/chatbot', icon: <IconGear /> },
-  { label: 'Nomor Petugas', href: '/_app/officers', icon: <IconUsers /> },
-  { label: 'Manajemen Konten', href: '/_app/content', icon: <IconFolder /> },
-  { label: 'WA Blast', href: '/_app/blast', icon: <IconMegaphone /> },
-  { label: 'API Keys', href: '/_app/api-keys', icon: <IconKey /> },
-  { label: 'Users & Roles', href: '/_app/users', icon: <IconShield /> },
-  { label: 'Settings', href: '/_app/settings', icon: <IconCog /> },
+  { label: 'Dashboard', href: '/dashboard', icon: <IconHome /> },
+  { label: 'WA Connection', href: '/wa-connection', icon: <IconPhone /> },
+  { label: 'Inbox', href: '/inbox', icon: <IconChat /> },
+  { label: 'Templates', href: '/templates', icon: <IconDocument /> },
+  { label: 'Chatbot Rules', href: '/chatbot', icon: <IconGear /> },
+  { label: 'Nomor Petugas', href: '/officers', icon: <IconUsers /> },
+  { label: 'Manajemen Konten', href: '/content', icon: <IconFolder /> },
+  { label: 'WA Blast', href: '/blast', icon: <IconMegaphone /> },
+  { label: 'API Keys', href: '/api-keys', icon: <IconKey /> },
+  { label: 'Users & Roles', href: '/users', icon: <IconShield /> },
+  { label: 'Settings', href: '/settings', icon: <IconCog /> },
 ]
 
 type SidebarProps = {

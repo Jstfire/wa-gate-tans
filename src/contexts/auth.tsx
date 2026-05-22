@@ -92,6 +92,7 @@ export function useAuth(): AuthContextValue {
   return ctx
 }
 
-export const authHeader = (): Record<string, string> => ({
-  Authorization: `Bearer ${localStorage.getItem('wa-gate-token') ?? ''}`,
-})
+export const authHeader = (): Record<string, string> => {
+  if (typeof window === 'undefined') return {}
+  return { Authorization: `Bearer ${localStorage.getItem('wa-gate-token') ?? ''}` }
+}

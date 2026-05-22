@@ -42,6 +42,7 @@ function ContentPage() {
 
   const query = createQuery(() => ({
     queryKey: ['content'],
+    enabled: typeof window !== 'undefined',
     queryFn: async () => {
       const res = await fetch('/api/content', { headers: authHeader() })
       if (!res.ok) throw new Error('Failed to fetch')

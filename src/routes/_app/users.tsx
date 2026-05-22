@@ -47,11 +47,13 @@ function UsersPage() {
 
   const usersQuery = createQuery(() => ({
     queryKey: ['users'],
+    enabled: typeof window !== 'undefined',
     queryFn: () => fetchJson<User[]>('/api/users'),
   }))
 
   const rolesQuery = createQuery(() => ({
     queryKey: ['roles'],
+    enabled: typeof window !== 'undefined',
     queryFn: () => fetchJson<Role[]>('/api/users/roles'),
   }))
 

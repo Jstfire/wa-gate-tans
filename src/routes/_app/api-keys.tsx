@@ -39,6 +39,7 @@ function ApiKeysPage() {
 
   const query = createQuery(() => ({
     queryKey: ['api-keys'],
+    enabled: typeof window !== 'undefined',
     queryFn: async () => {
       const res = await fetch('/api/api-keys', { headers: authHeader() })
       if (!res.ok) throw new Error('Failed to fetch')

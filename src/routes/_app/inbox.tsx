@@ -44,6 +44,7 @@ function InboxPage() {
 
   const contactsQuery = createQuery(() => ({
     queryKey: ['contacts'],
+    enabled: typeof window !== 'undefined',
     queryFn: () => fetchJson<Contact[]>('/api/messages/contacts'),
     refetchInterval: 10000,
   }))
@@ -51,7 +52,7 @@ function InboxPage() {
   const conversationQuery = createQuery(() => ({
     queryKey: ['conversation', selectedContact()],
     queryFn: () => fetchJson<Message[]>(`/api/messages/conversation/${selectedContact()}`),
-    enabled: !!selectedContact(),
+    enabled: typeof window !== 'undefined' && (!!selectedContact()),
     refetchInterval: 5000,
   }))
 

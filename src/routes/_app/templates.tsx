@@ -44,6 +44,7 @@ function TemplatesPage() {
 
   const query = createQuery(() => ({
     queryKey: ['templates'],
+    enabled: typeof window !== 'undefined',
     queryFn: async () => {
       const res = await fetch('/api/templates', { headers: authHeader() })
       if (!res.ok) throw new Error('Failed to fetch')
