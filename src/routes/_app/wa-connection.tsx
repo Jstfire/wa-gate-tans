@@ -57,7 +57,7 @@ function formatDate(value?: string | null): string {
   return new Date(value).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' })
 }
 
-function RuntimeCard(props: { runtime: RuntimeStatus; qr?: RuntimeQr; onRefreshQr: () => void; refreshing: boolean }) {
+function RuntimeCard(props: { runtime: RuntimeStatus; qr?: RuntimeQr; onRefreshQr: (kind: RuntimeKind) => void; refreshing: boolean }) {
   const canShowQr = () => props.qr?.qr && props.runtime.status !== 'connected' && props.runtime.status !== 'authenticated'
   return (
     <Card class="overflow-hidden border-slate-200 bg-white shadow-sm dark:border-white/10 dark:bg-slate-950/70">
@@ -98,8 +98,8 @@ function RuntimeCard(props: { runtime: RuntimeStatus; qr?: RuntimeQr; onRefreshQ
         <div class="rounded-3xl border border-slate-200 bg-slate-50 p-4 dark:border-white/10 dark:bg-slate-900/70">
           <div class="mb-3 flex items-center justify-between gap-3">
             <p class="text-sm font-medium text-slate-700 dark:text-slate-200">QR Code</p>
-            <Button variant="outline" size="sm" onClick={props.onRefreshQr} disabled={props.refreshing}>
-              {props.refreshing ? 'Loading...' : 'Refresh QR'}
+            <Button variant="outline" size="sm" class="border-slate-300 bg-white text-slate-800 hover:bg-slate-100 dark:border-white/15 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700" onClick={() => props.onRefreshQr(props.runtime.kind)} disabled={props.refreshing}>
+              {props.refreshing ? 'Loading...' : `Refresh QR ${props.runtime.kind}`}
             </Button>
           </div>
           <Show when={canShowQr()} fallback={<div class="flex h-64 items-center justify-center rounded-2xl border border-dashed border-slate-300 text-center text-sm text-slate-500 dark:border-white/10 dark:text-slate-400">QR tidak diperlukan saat runtime sudah connected/authenticated atau QR belum tersedia.</div>}>
@@ -124,7 +124,7 @@ function WaConnectionPage() {
   const [statusList, setStatusList] = createSignal<RuntimeStatus[]>([])
   const [qrList, setQrList] = createSignal<RuntimeQr[]>([])
   const [loading, setLoading] = createSignal(true)
-  const [refreshingQr, setRefreshingQr] = createSignal(false)
+  const [refreshingQr, setRefreshingQr] = createSignal<RuntimeKind | 'all' | null>(null)
   const [error, setError] = createSignal('')
 
   const refreshStatus = async () => {
@@ -139,14 +139,19 @@ function WaConnectionPage() {
     }
   }
 
-  const refreshQr = async () => {
-    setRefreshingQr(true)
+  const refreshQr = async (kind?: RuntimeKind) => {
+    setRefreshingQr(kind ?? 'all')
     try {
-      const result = await fetchJson<{ data: RuntimeQr[] }>('/api/wa/qr/all')
-      setQrList(result.data)
+      if (kind) {
+        const result = await fetchJson<RuntimeQr>(`/api/wa/qr/by/${kind}`)
+        setQrList((current) => [...current.filter((item) => item.kind !== kind), result])
+      } else {
+        const result = await fetchJson<{ data: RuntimeQr[] }>('/api/wa/qr/all')
+        setQrList(result.data)
+      }
       await refreshStatus()
     } finally {
-      setRefreshingQr(false)
+      setRefreshingQr(null)
     }
   }
 
@@ -169,7 +174,7 @@ function WaConnectionPage() {
         </div>
         <div class="flex gap-2">
           <Button variant="outline" onClick={refreshStatus} disabled={loading()}>{loading() ? 'Loading...' : 'Refresh Status'}</Button>
-          <Button onClick={refreshQr} disabled={refreshingQr()}>{refreshingQr() ? 'Loading QR...' : 'Refresh 2 QR'}</Button>
+          <Button onClick={() => refreshQr()} disabled={refreshingQr() !== null}>{refreshingQr() === 'all' ? 'Loading QR...' : 'Refresh 2 QR'}</Button>
         </div>
       </div>
 
@@ -179,7 +184,7 @@ function WaConnectionPage() {
 
       <div class="grid gap-5 xl:grid-cols-2">
         <For each={statusList()} fallback={<div class="rounded-3xl border border-dashed border-slate-300 p-10 text-center text-slate-500 dark:border-white/10 dark:text-slate-400">Memuat status runtime...</div>}>
-          {(runtime) => <RuntimeCard runtime={runtime} qr={qrFor(runtime.kind)} refreshing={refreshingQr()} onRefreshQr={refreshQr} />}
+          {(runtime) => <RuntimeCard runtime={runtime} qr={qrFor(runtime.kind)} refreshing={refreshingQr() === runtime.kind} onRefreshQr={refreshQr} />}
         </For>
       </div>
     </div>

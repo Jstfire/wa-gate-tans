@@ -113,6 +113,20 @@ waRuntime.get('/status/all', requirePermission('wa_connect'), async (c) => {
   return c.json({ data })
 })
 
+waRuntime.get('/qr/by/:kind', requirePermission('wa_connect'), async (c) => {
+  const key = envValue(c.env, 'WA_RUNTIME_API_KEY')
+  if (!key) return c.json({ error: 'WA runtime is not configured' }, 500)
+  const kind = c.req.param('kind')
+  const endpoint = runtimeEndpoints().find((item) => item.kind === kind)
+  if (!endpoint) return c.json({ error: 'Unknown runtime' }, 404)
+  try {
+    const qr = await runtimeFetchFrom<RuntimeQr>(endpoint.url, key, '/api/qr', {}, 12_000)
+    return c.json({ ...endpoint, ...qr, reachable: true })
+  } catch (error) {
+    return c.json({ ...endpoint, status: 'error', qr: null, raw: null, reachable: false, error: error instanceof Error ? error.message : 'Failed to fetch QR' }, 502)
+  }
+})
+
 waRuntime.get('/qr/all', requirePermission('wa_connect'), async (c) => {
   const key = envValue(c.env, 'WA_RUNTIME_API_KEY')
   if (!key) return c.json({ error: 'WA runtime is not configured' }, 500)
