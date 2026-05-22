@@ -143,11 +143,14 @@ function WaConnectionPage() {
     setRefreshingQr(kind ?? 'all')
     try {
       if (kind) {
-        const result = await fetchJson<RuntimeQr>(`/api/wa/qr/by/${kind}`)
+        const result = await fetchJson<RuntimeQr>(`/api/wa/qr/refresh/${kind}`, { method: 'POST' })
         setQrList((current) => [...current.filter((item) => item.kind !== kind), result])
       } else {
-        const result = await fetchJson<{ data: RuntimeQr[] }>('/api/wa/qr/all')
-        setQrList(result.data)
+        const [primary, backup] = await Promise.all([
+          fetchJson<RuntimeQr>('/api/wa/qr/refresh/primary', { method: 'POST' }),
+          fetchJson<RuntimeQr>('/api/wa/qr/refresh/backup', { method: 'POST' }),
+        ])
+        setQrList([primary, backup])
       }
       await refreshStatus()
     } finally {
