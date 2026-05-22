@@ -36,22 +36,28 @@ waRuntime.use('*', authMiddleware)
 
 type RuntimeEnv = Record<string, string | undefined>
 
+function asRuntimeEnv(env: unknown): RuntimeEnv {
+  return (env ?? {}) as RuntimeEnv
+}
+
 function envValue(env: RuntimeEnv | undefined, key: string): string {
   return env?.[key] ?? process.env[key] ?? ''
 }
 
 function runtimeConfig(env?: RuntimeEnv): { urls: string[]; key: string } {
-  const primary = 'https://wa-runtime.buseldata.com'
+  const internal = envValue(env, 'WA_RUNTIME_INTERNAL_URL').replace(/\/+$/, '')
+  const primary = internal || 'https://wa-runtime.buseldata.com'
   const urls = [primary].filter((url, index, arr): url is string => Boolean(url) && arr.indexOf(url) === index)
   const key = envValue(env, 'WA_RUNTIME_API_KEY')
   if (urls.length === 0 || !key) throw new Error('WA runtime is not configured')
   return { urls, key }
 }
 
-function runtimeEndpoints(): { label: string; kind: 'primary' | 'backup'; url: string }[] {
+function runtimeEndpoints(env?: RuntimeEnv): { label: string; kind: 'primary' | 'backup'; url: string; fetchUrl: string }[] {
+  const internal = envValue(env, 'WA_RUNTIME_INTERNAL_URL').replace(/\/+$/, '')
   return [
-    { label: 'Primary Windows PC', kind: 'primary', url: 'https://wa-runtime.buseldata.com' },
-    { label: 'Backup Koyeb', kind: 'backup', url: 'https://precise-melessa-ipds7415-39519134.koyeb.app' },
+    { label: 'Primary Windows PC', kind: 'primary', url: 'https://wa-runtime.buseldata.com', fetchUrl: internal || 'https://wa-runtime.buseldata.com' },
+    { label: 'Backup Koyeb', kind: 'backup', url: 'https://precise-melessa-ipds7415-39519134.koyeb.app', fetchUrl: 'https://precise-melessa-ipds7415-39519134.koyeb.app' },
   ]
 }
 
@@ -92,7 +98,7 @@ async function runtimeFetch<T>(path: string, init: RequestInit = {}, env?: Runti
 
 waRuntime.get('/status', requirePermission('wa_connect'), async (c) => {
   try {
-    const data = await runtimeFetch<RuntimeStatus>('/api/status', {}, c.env)
+    const data = await runtimeFetch<RuntimeStatus>('/api/status', {}, asRuntimeEnv(c.env))
     return c.json({ ...data, runtimeSource: 'windows-primary' })
   } catch (error) {
     return c.json({ status: 'error', error: error instanceof Error ? error.message : 'Failed to reach WA runtime', runtimeSource: 'windows-primary' }, 502)
@@ -100,42 +106,45 @@ waRuntime.get('/status', requirePermission('wa_connect'), async (c) => {
 })
 
 waRuntime.get('/status/all', requirePermission('wa_connect'), async (c) => {
-  const key = envValue(c.env, 'WA_RUNTIME_API_KEY')
+  const key = envValue(asRuntimeEnv(c.env), 'WA_RUNTIME_API_KEY')
   if (!key) return c.json({ error: 'WA runtime is not configured' }, 500)
-  const data = await Promise.all(runtimeEndpoints().map(async (endpoint) => {
+  const data = await Promise.all(runtimeEndpoints(asRuntimeEnv(c.env)).map(async (endpoint) => {
+    const { fetchUrl, ...visibleEndpoint } = endpoint
     try {
-      const status = await runtimeFetchFrom<RuntimeStatus>(endpoint.url, key, '/api/status', {}, 8_000)
-      return { ...endpoint, ...status, reachable: true }
+      const status = await runtimeFetchFrom<RuntimeStatus>(fetchUrl, key, '/api/status', {}, 8_000)
+      return { ...visibleEndpoint, ...status, reachable: true }
     } catch (error) {
-      return { ...endpoint, status: 'error', reachable: false, error: error instanceof Error ? error.message : 'Failed to reach runtime' }
+      return { ...visibleEndpoint, status: 'error', reachable: false, error: error instanceof Error ? error.message : 'Failed to reach runtime' }
     }
   }))
   return c.json({ data })
 })
 
 waRuntime.get('/qr/by/:kind', requirePermission('wa_connect'), async (c) => {
-  const key = envValue(c.env, 'WA_RUNTIME_API_KEY')
+  const key = envValue(asRuntimeEnv(c.env), 'WA_RUNTIME_API_KEY')
   if (!key) return c.json({ error: 'WA runtime is not configured' }, 500)
   const kind = c.req.param('kind')
-  const endpoint = runtimeEndpoints().find((item) => item.kind === kind)
+  const endpoint = runtimeEndpoints(asRuntimeEnv(c.env)).find((item) => item.kind === kind)
   if (!endpoint) return c.json({ error: 'Unknown runtime' }, 404)
+  const { fetchUrl, ...visibleEndpoint } = endpoint
   try {
-    const qr = await runtimeFetchFrom<RuntimeQr>(endpoint.url, key, '/api/qr', {}, 12_000)
-    return c.json({ ...endpoint, ...qr, reachable: true })
+    const qr = await runtimeFetchFrom<RuntimeQr>(fetchUrl, key, '/api/qr', {}, 12_000)
+    return c.json({ ...visibleEndpoint, ...qr, reachable: true })
   } catch (error) {
-    return c.json({ ...endpoint, status: 'error', qr: null, raw: null, reachable: false, error: error instanceof Error ? error.message : 'Failed to fetch QR' }, 502)
+    return c.json({ ...visibleEndpoint, status: 'error', qr: null, raw: null, reachable: false, error: error instanceof Error ? error.message : 'Failed to fetch QR' }, 502)
   }
 })
 
 waRuntime.get('/qr/all', requirePermission('wa_connect'), async (c) => {
-  const key = envValue(c.env, 'WA_RUNTIME_API_KEY')
+  const key = envValue(asRuntimeEnv(c.env), 'WA_RUNTIME_API_KEY')
   if (!key) return c.json({ error: 'WA runtime is not configured' }, 500)
-  const data = await Promise.all(runtimeEndpoints().map(async (endpoint) => {
+  const data = await Promise.all(runtimeEndpoints(asRuntimeEnv(c.env)).map(async (endpoint) => {
+    const { fetchUrl, ...visibleEndpoint } = endpoint
     try {
-      const qr = await runtimeFetchFrom<RuntimeQr>(endpoint.url, key, '/api/qr', {}, 12_000)
-      return { ...endpoint, ...qr, reachable: true }
+      const qr = await runtimeFetchFrom<RuntimeQr>(fetchUrl, key, '/api/qr', {}, 12_000)
+      return { ...visibleEndpoint, ...qr, reachable: true }
     } catch (error) {
-      return { ...endpoint, status: 'error', qr: null, raw: null, reachable: false, error: error instanceof Error ? error.message : 'Failed to fetch QR' }
+      return { ...visibleEndpoint, status: 'error', qr: null, raw: null, reachable: false, error: error instanceof Error ? error.message : 'Failed to fetch QR' }
     }
   }))
   return c.json({ data })
@@ -143,7 +152,7 @@ waRuntime.get('/qr/all', requirePermission('wa_connect'), async (c) => {
 
 waRuntime.get('/qr', requirePermission('wa_connect'), async (c) => {
   try {
-    const data = await runtimeFetch<RuntimeQr>('/api/qr', {}, c.env)
+    const data = await runtimeFetch<RuntimeQr>('/api/qr', {}, asRuntimeEnv(c.env))
     return c.json(data)
   } catch (error) {
     return c.json({ status: 'error', qr: null, raw: null, error: error instanceof Error ? error.message : 'Failed to fetch QR' }, 502)
@@ -152,7 +161,7 @@ waRuntime.get('/qr', requirePermission('wa_connect'), async (c) => {
 
 waRuntime.post('/connect', requirePermission('wa_connect'), async (c) => {
   try {
-    const data = await runtimeFetch<RuntimeStatus>('/api/connect', { method: 'POST' }, c.env)
+    const data = await runtimeFetch<RuntimeStatus>('/api/connect', { method: 'POST' }, asRuntimeEnv(c.env))
     return c.json(data)
   } catch (error) {
     return c.json({ status: 'error', error: error instanceof Error ? error.message : 'Failed to connect WA runtime' }, 502)
@@ -161,7 +170,7 @@ waRuntime.post('/connect', requirePermission('wa_connect'), async (c) => {
 
 waRuntime.post('/disconnect', requirePermission('wa_connect'), async (c) => {
   try {
-    const data = await runtimeFetch<RuntimeStatus>('/api/disconnect', { method: 'POST' }, c.env)
+    const data = await runtimeFetch<RuntimeStatus>('/api/disconnect', { method: 'POST' }, asRuntimeEnv(c.env))
     return c.json(data)
   } catch (error) {
     return c.json({ status: 'error', error: error instanceof Error ? error.message : 'Failed to disconnect WA runtime' }, 502)
