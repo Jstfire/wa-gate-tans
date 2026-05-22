@@ -161,7 +161,7 @@ waRuntime.get('/qr/by/:kind', requirePermission('wa_connect'), async (c) => {
   if (!endpoint) return c.json({ error: 'Unknown runtime' }, 404)
   const { fetchUrl, ...visibleEndpoint } = endpoint
   try {
-    const qr = await runtimeFetchFrom<RuntimeQr>(fetchUrl, key, '/api/qr', {}, 12_000)
+    const qr = await fetchFreshQr(endpoint, key)
     return c.json({ ...visibleEndpoint, ...qr, reachable: true })
   } catch (error) {
     return c.json({ ...visibleEndpoint, status: 'error', qr: null, raw: null, reachable: false, error: error instanceof Error ? error.message : 'Failed to fetch QR' }, 502)
