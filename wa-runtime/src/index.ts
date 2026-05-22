@@ -114,6 +114,32 @@ function isAuthorized(authHeader: string | undefined): boolean {
   return bearer === config.apiKey
 }
 
+async function forwardIncomingMessage(message: WaMessage): Promise<void> {
+  if (message.fromMe || !message.body.trim()) return
+
+  try {
+    const response = await fetch(`${config.corsOrigin}/api/runtime/incoming`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${config.apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        from: message.from,
+        to: message.to,
+        body: message.body,
+        messageId: message.id.id,
+        timestamp: message.timestamp,
+      }),
+    })
+    if (!response.ok) {
+      console.error('[WA-RUNTIME] Incoming webhook failed:', response.status, await response.text())
+    }
+  } catch (err: unknown) {
+    console.error('[WA-RUNTIME] Incoming webhook error:', err instanceof Error ? err.message : String(err))
+  }
+}
+
 async function ensureClient(): Promise<void> {
   if (client && state.status !== 'error') return
   if (initializing) return initializing
@@ -198,6 +224,7 @@ async function startClient(): Promise<void> {
 
   client.on('message', (message: WaMessage) => {
     console.log('[WA-RUNTIME] Incoming message', JSON.stringify({ from: message.from, type: message.type, hasBody: message.body.length > 0 }))
+    void forwardIncomingMessage(message)
   })
 
   void client.initialize().catch((err: unknown) => {
