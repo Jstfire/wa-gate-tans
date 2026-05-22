@@ -16,8 +16,8 @@ const capabilities = [
 
 const metrics = [
   { label: 'Runtime', value: 'Primary + Backup' },
-  { label: 'Storage', value: 'Google Drive API' },
-  { label: 'Auth', value: 'DB Induk + RBAC' },
+  { label: 'Pengiriman', value: 'Human-like' },
+  { label: 'Kontrol', value: 'Role Based' },
 ]
 
 function LoginPage() {
@@ -71,7 +71,7 @@ function LoginPage() {
               Command center WhatsApp untuk pelayanan statistik yang lebih cepat.
             </h1>
             <p class="mt-5 max-w-2xl text-base leading-7 text-slate-300 md:text-lg">
-              Kelola koneksi WhatsApp, inbox, chatbot, template pesan, nomor petugas, file Google Drive, API key, dan blast queue dari satu dashboard modern dengan kontrol anti-ban.
+              Kelola inbox, chatbot, template pesan, konten layanan, API key, dan blast queue dari satu dashboard modern dengan kontrol pengiriman yang aman.
             </p>
 
             <div class="mt-8 grid gap-3 sm:grid-cols-3">
@@ -101,7 +101,7 @@ function LoginPage() {
               <div class="mb-7">
                 <p class="text-sm font-medium text-emerald-600 dark:text-emerald-300">Masuk Dashboard</p>
                 <h2 class="mt-2 text-3xl font-semibold tracking-tight text-slate-950 dark:text-white">Selamat datang kembali</h2>
-                <p class="mt-2 text-sm leading-6 text-slate-500 dark:text-slate-400">Gunakan akun database induk BPS untuk mengakses modul WA Gate sesuai role.</p>
+                <p class="mt-2 text-sm leading-6 text-slate-500 dark:text-slate-400">Masuk untuk mengelola layanan WhatsApp resmi BPS Kabupaten Buton Selatan.</p>
               </div>
 
               <form onSubmit={handleSubmit} class="space-y-4">
@@ -140,7 +140,7 @@ function LoginPage() {
 
               <div class="mt-6 rounded-2xl border border-slate-200 bg-white p-4 dark:border-white/10 dark:bg-slate-900/70">
                 <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Modul tersedia</p>
-                <p class="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-300">Dashboard, WA Connection, Inbox Live, Template, Chatbot Rules, Officer Numbers, Content Files, API Keys, Users & Roles, dan WA Blast.</p>
+                <p class="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-300">Inbox Live, WA Connection, Template, Chatbot, Konten Layanan, API Keys, dan WA Blast.</p>
               </div>
             </div>
           </div>

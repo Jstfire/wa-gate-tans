@@ -1,5 +1,5 @@
 import { createFileRoute } from '@tanstack/solid-router'
-import { createSignal, Show, onMount } from 'solid-js'
+import { createSignal, For, Show, onCleanup, onMount } from 'solid-js'
 import { Card, CardContent, CardHeader } from '../../components/ui/card'
 import { Badge } from '../../components/ui/badge'
 import { Button } from '../../components/ui/button'
@@ -9,127 +9,179 @@ export const Route = createFileRoute('/_app/wa-connection')({
   component: WaConnectionPage,
 })
 
-function fetchWithAuth(url: string) {
-  return fetch(url, { headers: authHeader() }).then((res) => {
-    if (!res.ok) throw new Error('Failed to fetch')
-    return res.json() as Promise<Record<string, unknown>>
+type RuntimeKind = 'primary' | 'backup'
+type RuntimeStatus = {
+  label: string
+  kind: RuntimeKind
+  url: string
+  status: string
+  reachable: boolean
+  hasQr?: boolean
+  lastError?: string | null
+  error?: string
+  lastEventAt?: string | null
+  readyAt?: string | null
+  reconnectAttempts?: number
+  account?: { wid: string; pushname?: string } | null
+}
+
+type RuntimeQr = {
+  label: string
+  kind: RuntimeKind
+  url: string
+  status: string
+  reachable: boolean
+  qr: string | null
+  raw: string | null
+  error?: string
+}
+
+function fetchJson<T>(url: string): Promise<T> {
+  return fetch(url, { headers: authHeader() }).then(async (res) => {
+    const text = await res.text()
+    const data = text ? JSON.parse(text) as T : {} as T
+    if (!res.ok) throw new Error('error' in (data as Record<string, unknown>) ? String((data as { error?: unknown }).error) : 'Request failed')
+    return data
   })
 }
 
-function shouldFetchQr(data: Record<string, unknown>): boolean {
-  return data.status !== 'connected' && data.hasQr === true
+function statusVariant(status: string): 'success' | 'warning' | 'destructive' | 'secondary' {
+  if (status === 'connected' || status === 'authenticated') return 'success'
+  if (status === 'qr_pending' || status === 'initializing' || status === 'connecting') return 'warning'
+  if (status === 'error' || status === 'disconnected') return 'destructive'
+  return 'secondary'
+}
+
+function formatDate(value?: string | null): string {
+  if (!value) return '-'
+  return new Date(value).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' })
+}
+
+function RuntimeCard(props: { runtime: RuntimeStatus; qr?: RuntimeQr; onRefreshQr: () => void; refreshing: boolean }) {
+  const canShowQr = () => props.qr?.qr && props.runtime.status !== 'connected' && props.runtime.status !== 'authenticated'
+  return (
+    <Card class="overflow-hidden border-slate-200 bg-white shadow-sm dark:border-white/10 dark:bg-slate-950/70">
+      <CardHeader>
+        <div class="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <div class="flex items-center gap-2">
+              <h2 class="text-base font-semibold text-slate-950 dark:text-white">{props.runtime.label}</h2>
+              <Badge variant={props.runtime.kind === 'primary' ? 'success' : 'secondary'}>{props.runtime.kind}</Badge>
+            </div>
+            <p class="mt-1 break-all text-xs text-slate-500 dark:text-slate-400">{props.runtime.url}</p>
+          </div>
+          <Badge variant={statusVariant(props.runtime.status)}>{props.runtime.status}</Badge>
+        </div>
+      </CardHeader>
+      <CardContent class="space-y-4">
+        <div class="grid gap-3 sm:grid-cols-2">
+          <Info label="Reachable" value={props.runtime.reachable ? 'Ya' : 'Tidak'} />
+          <Info label="Has QR" value={props.runtime.hasQr ? 'Ya' : 'Tidak'} />
+          <Info label="Ready At" value={formatDate(props.runtime.readyAt)} />
+          <Info label="Last Event" value={formatDate(props.runtime.lastEventAt)} />
+          <Info label="Reconnect" value={String(props.runtime.reconnectAttempts ?? 0)} />
+          <Info label="Akun" value={props.runtime.account?.pushname ?? props.runtime.account?.wid ?? '-'} />
+        </div>
+
+        <Show when={props.runtime.account?.wid}>
+          <div class="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-100">
+            Terhubung sebagai <span class="font-semibold">{props.runtime.account?.wid}</span>
+          </div>
+        </Show>
+
+        <Show when={props.runtime.lastError || props.runtime.error}>
+          <div class="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-500/20 dark:bg-red-500/10 dark:text-red-200">
+            {props.runtime.lastError ?? props.runtime.error}
+          </div>
+        </Show>
+
+        <div class="rounded-3xl border border-slate-200 bg-slate-50 p-4 dark:border-white/10 dark:bg-slate-900/70">
+          <div class="mb-3 flex items-center justify-between gap-3">
+            <p class="text-sm font-medium text-slate-700 dark:text-slate-200">QR Code</p>
+            <Button variant="outline" size="sm" onClick={props.onRefreshQr} disabled={props.refreshing}>
+              {props.refreshing ? 'Loading...' : 'Refresh QR'}
+            </Button>
+          </div>
+          <Show when={canShowQr()} fallback={<div class="flex h-64 items-center justify-center rounded-2xl border border-dashed border-slate-300 text-center text-sm text-slate-500 dark:border-white/10 dark:text-slate-400">QR tidak diperlukan saat runtime sudah connected/authenticated atau QR belum tersedia.</div>}>
+            <img src={props.qr?.qr ?? ''} alt={`QR ${props.runtime.label}`} class="mx-auto h-64 w-64 rounded-2xl bg-white p-3" />
+          </Show>
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
+
+function Info(props: { label: string; value: string }) {
+  return (
+    <div class="rounded-2xl border border-slate-200 bg-slate-50 p-3 dark:border-white/10 dark:bg-slate-900/70">
+      <p class="text-xs text-slate-500 dark:text-slate-400">{props.label}</p>
+      <p class="mt-1 truncate text-sm font-semibold text-slate-900 dark:text-white" title={props.value}>{props.value}</p>
+    </div>
+  )
 }
 
 function WaConnectionPage() {
-  const [connecting, setConnecting] = createSignal(false)
+  const [statusList, setStatusList] = createSignal<RuntimeStatus[]>([])
+  const [qrList, setQrList] = createSignal<RuntimeQr[]>([])
+  const [loading, setLoading] = createSignal(true)
   const [refreshingQr, setRefreshingQr] = createSignal(false)
-  const [statusData, setStatusData] = createSignal<Record<string, unknown> | null>(null)
-  const [qrData, setQrData] = createSignal<Record<string, unknown> | null>(null)
+  const [error, setError] = createSignal('')
 
-  const refreshStatus = async (options: { includeQr?: boolean } = {}) => {
+  const refreshStatus = async () => {
     try {
-      const data = await fetchWithAuth('/api/wa/status')
-      setStatusData(data)
-
-      if (data.status === 'connected' || data.status === 'authenticated') {
-        setQrData(null)
-        return
-      }
-
-      if (options.includeQr && shouldFetchQr(data)) {
-        const qr = await fetchWithAuth('/api/wa/qr')
-        setQrData(qr)
-      }
-    } catch {
-      setStatusData({ status: 'unknown' })
+      setError('')
+      const result = await fetchJson<{ data: RuntimeStatus[] }>('/api/wa/status/all')
+      setStatusList(result.data)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Gagal mengambil status WA')
+    } finally {
+      setLoading(false)
     }
   }
 
   const refreshQr = async () => {
     setRefreshingQr(true)
     try {
-      await refreshStatus({ includeQr: true })
+      const result = await fetchJson<{ data: RuntimeQr[] }>('/api/wa/qr/all')
+      setQrList(result.data)
+      await refreshStatus()
     } finally {
       setRefreshingQr(false)
     }
   }
 
+  const qrFor = (kind: RuntimeKind) => qrList().find((item) => item.kind === kind)
+
   onMount(() => {
-    void refreshStatus({ includeQr: true })
-    const interval = window.setInterval(() => {
-      const current = status()
-      if (current === 'qr_pending' || current === 'authenticated' || current === 'initializing') {
-        void refreshStatus({ includeQr: false })
-      }
-    }, 5000)
-    return () => window.clearInterval(interval)
+    void refreshStatus()
+    void refreshQr()
+    const id = window.setInterval(() => void refreshStatus(), 5000)
+    onCleanup(() => window.clearInterval(id))
   })
 
-  const handleConnect = async () => {
-    setConnecting(true)
-    try {
-      await fetch('/api/wa/connect', { method: 'POST', headers: authHeader() })
-      await refreshStatus({ includeQr: true })
-    } finally {
-      setConnecting(false)
-    }
-  }
-
-  const handleDisconnect = async () => {
-    await fetch('/api/wa/disconnect', { method: 'POST', headers: authHeader() })
-    await refreshStatus({ includeQr: true })
-  }
-
-  const status = () => (statusData()?.status as string) ?? 'unknown'
-
   return (
-    <div class="flex flex-col gap-6">
-      <div>
-        <h1 class="text-2xl font-bold text-gray-900 dark:text-white">WA Connection</h1>
-        <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">Manage your WhatsApp connection</p>
+    <div class="space-y-6">
+      <div class="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <p class="text-sm font-medium uppercase tracking-[0.25em] text-emerald-600 dark:text-emerald-300">WA Runtime Monitor</p>
+          <h1 class="mt-2 text-3xl font-semibold tracking-tight text-slate-950 dark:text-white">WA Connection</h1>
+          <p class="mt-2 max-w-2xl text-sm leading-6 text-slate-500 dark:text-slate-400">Pantau koneksi Primary Windows dan Backup Koyeb lengkap dengan QR, akun, status event, dan error terakhir.</p>
+        </div>
+        <div class="flex gap-2">
+          <Button variant="outline" onClick={refreshStatus} disabled={loading()}>{loading() ? 'Loading...' : 'Refresh Status'}</Button>
+          <Button onClick={refreshQr} disabled={refreshingQr()}>{refreshingQr() ? 'Loading QR...' : 'Refresh 2 QR'}</Button>
+        </div>
       </div>
 
-      <Card class="max-w-lg">
-        <CardHeader>
-          <div class="flex items-center justify-between">
-            <p class="text-sm font-medium text-gray-700 dark:text-gray-300">Connection Status</p>
-            <Badge variant={status() === 'connected' || status() === 'authenticated' ? 'success' : status() === 'connecting' || status() === 'qr_pending' || status() === 'initializing' ? 'warning' : 'destructive'}>
-              {status()}
-            </Badge>
-          </div>
-        </CardHeader>
-        <CardContent class="flex flex-col gap-4">
-          <Show when={(statusData()?.account as { wid?: string; pushname?: string } | null)?.wid}>
-            <p class="text-sm text-gray-600 dark:text-gray-400">
-              Connected as: <span class="font-medium text-gray-900 dark:text-white">{(statusData()?.account as { wid?: string; pushname?: string } | null)?.wid}</span>
-            </p>
-          </Show>
+      <Show when={error()}>
+        <div class="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-500/20 dark:bg-red-500/10 dark:text-red-200">{error()}</div>
+      </Show>
 
-          <Show when={qrData()?.qr}>
-            <div class="flex flex-col items-center gap-3 rounded-lg border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-800">
-              <p class="text-sm text-gray-600 dark:text-gray-400">Scan QR code with WhatsApp</p>
-              <img src={qrData()?.qr as string} alt="QR Code" class="h-64 w-64" />
-              <p class="text-center text-xs text-gray-500 dark:text-gray-400">QR hanya diambil saat halaman ini dibuka atau tombol refresh ditekan.</p>
-            </div>
-          </Show>
-
-          <div class="flex flex-wrap gap-3">
-            <Show when={status() !== 'connected' && status() !== 'authenticated'}>
-              <Button onClick={handleConnect} disabled={connecting() || status() === 'connecting' || status() === 'initializing'}>
-                {connecting() ? 'Connecting...' : 'Connect'}
-              </Button>
-              <Button variant="outline" onClick={refreshQr} disabled={refreshingQr() || status() === 'connected'}>
-                {refreshingQr() ? 'Refreshing...' : 'Refresh QR'}
-              </Button>
-            </Show>
-            <Show when={status() === 'connected' || status() === 'authenticated'}>
-              <Button variant="destructive" onClick={handleDisconnect}>
-                Disconnect
-              </Button>
-            </Show>
-          </div>
-        </CardContent>
-      </Card>
+      <div class="grid gap-5 xl:grid-cols-2">
+        <For each={statusList()} fallback={<div class="rounded-3xl border border-dashed border-slate-300 p-10 text-center text-slate-500 dark:border-white/10 dark:text-slate-400">Memuat status runtime...</div>}>
+          {(runtime) => <RuntimeCard runtime={runtime} qr={qrFor(runtime.kind)} refreshing={refreshingQr()} onRefreshQr={refreshQr} />}
+        </For>
+      </div>
     </div>
   )
 }
