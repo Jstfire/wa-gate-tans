@@ -85,7 +85,7 @@ messages.post('/send', requirePermission('wa_send'), async (c) => {
 
     const to = body.to.trim()
     const message = body.message.trim()
-    const runtimeResult = await sendViaRuntime(to, message)
+    const runtimeResult = await sendViaRuntime(to, message, c.env)
     if (!runtimeResult.success) {
       return c.json({ error: runtimeResult.error ?? 'Failed to send message via WA runtime' }, 502)
     }

@@ -119,12 +119,12 @@ waRuntime.post('/disconnect', requirePermission('wa_connect'), async (c) => {
   }
 })
 
-export async function sendViaRuntime(to: string, message: string): Promise<RuntimeSendResponse> {
+export async function sendViaRuntime(to: string, message: string, env?: RuntimeEnv): Promise<RuntimeSendResponse> {
   return runtimeFetch<RuntimeSendResponse>('/api/send', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ to, message, simulateTyping: true }),
-  })
+  }, env)
 }
 
 export default waRuntime
