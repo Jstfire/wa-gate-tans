@@ -1,6 +1,5 @@
 import { createFileRoute } from '@tanstack/solid-router'
-import { createQuery, createMutation, useQueryClient } from '@tanstack/solid-query'
-import { createSignal } from 'solid-js'
+import { createSignal, onMount } from 'solid-js'
 import { createColumnHelper } from '@tanstack/solid-table'
 import type { ColumnDef } from '@tanstack/solid-table'
 import { DataTable } from '../../components/data-table'
@@ -36,25 +35,38 @@ const col = createColumnHelper<Rule>()
 const emptyForm = (): RuleForm => ({ trigger: '', parentTrigger: '', responseType: 'text', responseContent: '', order: 0, isActive: true })
 
 function ChatbotPage() {
-  const qc = useQueryClient()
   const [search, setSearch] = createSignal('')
   const [dialogOpen, setDialogOpen] = createSignal(false)
   const [deleteId, setDeleteId] = createSignal<string | null>(null)
   const [editing, setEditing] = createSignal<Rule | null>(null)
   const [form, setForm] = createSignal<RuleForm>(emptyForm())
 
-  const query = createQuery(() => ({
-    queryKey: ['chatbot-rules'],
-    enabled: typeof window !== 'undefined',
-    queryFn: async () => {
+  const [rules, setRules] = createSignal<Rule[]>([])
+  const [loading, setLoading] = createSignal(true)
+  const [error, setError] = createSignal<string | null>(null)
+  const [saving, setSaving] = createSignal(false)
+  const [deleting, setDeleting] = createSignal(false)
+
+  const refreshRules = async () => {
+    setLoading(true)
+    setError(null)
+    try {
       const res = await fetch('/api/chatbot/rules', { headers: authHeader() })
       if (!res.ok) throw new Error('Failed to fetch')
-      return res.json() as Promise<Rule[]>
-    },
-  }))
+      setRules((await res.json()) as Rule[])
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to fetch')
+    } finally {
+      setLoading(false)
+    }
+  }
 
-  const saveMutation = createMutation(() => ({
-    mutationFn: async (data: RuleForm) => {
+  onMount(() => { void refreshRules() })
+
+  const saveRule = async (data: RuleForm) => {
+    setSaving(true)
+    setError(null)
+    try {
       const body = {
         trigger: data.trigger,
         parentTrigger: data.parentTrigger || undefined,
@@ -70,18 +82,29 @@ function ChatbotPage() {
         body: JSON.stringify(body),
       })
       if (!res.ok) throw new Error('Failed to save')
-      return res.json()
-    },
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['chatbot-rules'] }); closeDialog() },
-  }))
+      closeDialog()
+      await refreshRules()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to save')
+    } finally {
+      setSaving(false)
+    }
+  }
 
-  const deleteMutation = createMutation(() => ({
-    mutationFn: async (id: string) => {
+  const deleteRule = async (id: string) => {
+    setDeleting(true)
+    setError(null)
+    try {
       const res = await fetch(`/api/chatbot/rules/${id}`, { method: 'DELETE', headers: authHeader() })
       if (!res.ok) throw new Error('Failed to delete')
-    },
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['chatbot-rules'] }); setDeleteId(null) },
-  }))
+      setDeleteId(null)
+      await refreshRules()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to delete')
+    } finally {
+      setDeleting(false)
+    }
+  }
 
   const openCreate = () => { setEditing(null); setForm(emptyForm()); setDialogOpen(true) }
   const openEdit = (r: Rule) => {
@@ -115,14 +138,15 @@ function ChatbotPage() {
       </div>
       <Card>
         <CardContent class="pt-6">
-          <DataTable data={query.data ?? []} columns={columns as ColumnDef<Rule, unknown>[]} loading={query.isLoading} globalFilter={search()} onGlobalFilterChange={setSearch} />
+          {error() && <p class="mb-4 text-sm text-red-600 dark:text-red-400">{error()}</p>}
+          <DataTable data={rules()} columns={columns as ColumnDef<Rule, unknown>[]} loading={loading()} globalFilter={search()} onGlobalFilterChange={setSearch} />
         </CardContent>
       </Card>
 
       <Dialog open={dialogOpen()} onClose={closeDialog}>
         <DialogContent>
           <DialogHeader><DialogTitle>{editing() ? 'Edit Rule' : 'Tambah Rule'}</DialogTitle></DialogHeader>
-          <form onSubmit={(e) => { e.preventDefault(); saveMutation.mutate(form()) }} class="space-y-4">
+          <form onSubmit={(e) => { e.preventDefault(); void saveRule(form()) }} class="space-y-4">
             <Input label="Trigger *" required value={form().trigger} onInput={(e) => setForm({ ...form(), trigger: e.currentTarget.value })} />
             <Input label="Parent Trigger" value={form().parentTrigger} onInput={(e) => setForm({ ...form(), parentTrigger: e.currentTarget.value })} />
             <div class="flex flex-col gap-1">
@@ -142,7 +166,7 @@ function ChatbotPage() {
             </label>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={closeDialog}>Batal</Button>
-              <Button type="submit" disabled={saveMutation.isPending}>{saveMutation.isPending ? 'Menyimpan...' : 'Simpan'}</Button>
+              <Button type="submit" disabled={saving()}>{saving() ? 'Menyimpan...' : 'Simpan'}</Button>
             </DialogFooter>
           </form>
         </DialogContent>
@@ -154,8 +178,8 @@ function ChatbotPage() {
           <p class="text-sm text-slate-600 dark:text-slate-400">Yakin ingin menghapus rule ini?</p>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDeleteId(null)}>Batal</Button>
-            <Button variant="destructive" disabled={deleteMutation.isPending} onClick={() => { const id = deleteId(); if (id) deleteMutation.mutate(id) }}>
-              {deleteMutation.isPending ? 'Menghapus...' : 'Hapus'}
+            <Button variant="destructive" disabled={deleting()} onClick={() => { const id = deleteId(); if (id) void deleteRule(id) }}>
+              {deleting() ? 'Menghapus...' : 'Hapus'}
             </Button>
           </DialogFooter>
         </DialogContent>

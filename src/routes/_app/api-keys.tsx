@@ -1,6 +1,5 @@
 import { createFileRoute } from '@tanstack/solid-router'
-import { createQuery, createMutation, useQueryClient } from '@tanstack/solid-query'
-import { createSignal, Show } from 'solid-js'
+import { createSignal, Show, onMount } from 'solid-js'
 import { createColumnHelper } from '@tanstack/solid-table'
 import type { ColumnDef } from '@tanstack/solid-table'
 import { DataTable } from '../../components/data-table'
@@ -30,47 +29,65 @@ function maskKey(key: string): string {
 }
 
 function ApiKeysPage() {
-  const qc = useQueryClient()
+  const [data, setData] = createSignal<ApiKeyItem[]>([])
+  const [loading, setLoading] = createSignal(true)
   const [search, setSearch] = createSignal('')
   const [createOpen, setCreateOpen] = createSignal(false)
   const [revokeId, setRevokeId] = createSignal<string | null>(null)
   const [keyName, setKeyName] = createSignal('')
   const [generatedKey, setGeneratedKey] = createSignal<string | null>(null)
+  const [creating, setCreating] = createSignal(false)
+  const [revoking, setRevoking] = createSignal(false)
 
-  const query = createQuery(() => ({
-    queryKey: ['api-keys'],
-    enabled: typeof window !== 'undefined',
-    queryFn: async () => {
+  const fetchKeys = async () => {
+    setLoading(true)
+    try {
       const res = await fetch('/api/api-keys', { headers: authHeader() })
       if (!res.ok) throw new Error('Failed to fetch')
-      return res.json() as Promise<ApiKeyItem[]>
-    },
-  }))
+      const json = await res.json()
+      setData(json)
+    } catch {
+      // ignore
+    } finally {
+      setLoading(false)
+    }
+  }
 
-  const createMut = createMutation(() => ({
-    mutationFn: async (name: string) => {
+  onMount(fetchKeys)
+
+  const createKey = async (name: string) => {
+    setCreating(true)
+    try {
       const res = await fetch('/api/api-keys', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...authHeader() },
         body: JSON.stringify({ name }),
       })
       if (!res.ok) throw new Error('Failed to create')
-      return res.json() as Promise<{ key: string }>
-    },
-    onSuccess: (data) => {
-      qc.invalidateQueries({ queryKey: ['api-keys'] })
-      setGeneratedKey(data.key)
+      const json = await res.json()
+      setGeneratedKey(json.key)
       setKeyName('')
-    },
-  }))
+      await fetchKeys()
+    } catch {
+      // ignore
+    } finally {
+      setCreating(false)
+    }
+  }
 
-  const revokeMut = createMutation(() => ({
-    mutationFn: async (id: string) => {
+  const revokeKey = async (id: string) => {
+    setRevoking(true)
+    try {
       const res = await fetch(`/api/api-keys/${id}`, { method: 'DELETE', headers: authHeader() })
       if (!res.ok) throw new Error('Failed to revoke')
-    },
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['api-keys'] }); setRevokeId(null) },
-  }))
+      setRevokeId(null)
+      await fetchKeys()
+    } catch {
+      // ignore
+    } finally {
+      setRevoking(false)
+    }
+  }
 
   const closeCreate = () => { setCreateOpen(false); setKeyName(''); setGeneratedKey(null) }
 
@@ -95,7 +112,7 @@ function ApiKeysPage() {
       </div>
       <Card>
         <CardContent class="pt-6">
-          <DataTable data={query.data ?? []} columns={columns as ColumnDef<ApiKeyItem, unknown>[]} loading={query.isLoading} globalFilter={search()} onGlobalFilterChange={setSearch} />
+          <DataTable data={data()} columns={columns as ColumnDef<ApiKeyItem, unknown>[]} loading={loading()} globalFilter={search()} onGlobalFilterChange={setSearch} />
         </CardContent>
       </Card>
 
@@ -113,11 +130,11 @@ function ApiKeysPage() {
               </DialogFooter>
             </div>
           }>
-            <form onSubmit={(e) => { e.preventDefault(); if (keyName()) createMut.mutate(keyName()) }} class="space-y-4">
+            <form onSubmit={(e) => { e.preventDefault(); if (keyName()) createKey(keyName()) }} class="space-y-4">
               <Input label="Nama Key *" required value={keyName()} onInput={(e) => setKeyName(e.currentTarget.value)} placeholder="Contoh: Production App" />
               <DialogFooter>
                 <Button type="button" variant="outline" onClick={closeCreate}>Batal</Button>
-                <Button type="submit" disabled={createMut.isPending}>{createMut.isPending ? 'Generating...' : 'Generate'}</Button>
+                <Button type="submit" disabled={creating()}>{creating() ? 'Generating...' : 'Generate'}</Button>
               </DialogFooter>
             </form>
           </Show>
@@ -130,8 +147,8 @@ function ApiKeysPage() {
           <p class="text-sm text-slate-600 dark:text-slate-400">Key yang di-revoke tidak dapat digunakan lagi. Yakin?</p>
           <DialogFooter>
             <Button variant="outline" onClick={() => setRevokeId(null)}>Batal</Button>
-            <Button variant="destructive" disabled={revokeMut.isPending} onClick={() => { const id = revokeId(); if (id) revokeMut.mutate(id) }}>
-              {revokeMut.isPending ? 'Revoking...' : 'Revoke'}
+            <Button variant="destructive" disabled={revoking()} onClick={() => { const id = revokeId(); if (id) revokeKey(id) }}>
+              {revoking() ? 'Revoking...' : 'Revoke'}
             </Button>
           </DialogFooter>
         </DialogContent>

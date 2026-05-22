@@ -1,6 +1,5 @@
 import { createFileRoute } from '@tanstack/solid-router'
-import { createQuery, createMutation, useQueryClient } from '@tanstack/solid-query'
-import { createSignal } from 'solid-js'
+import { createSignal, onMount } from 'solid-js'
 import { createColumnHelper } from '@tanstack/solid-table'
 import type { ColumnDef } from '@tanstack/solid-table'
 import { DataTable } from '../../components/data-table'
@@ -32,7 +31,6 @@ function formatSize(bytes: number): string {
 }
 
 function ContentPage() {
-  const qc = useQueryClient()
   const [search, setSearch] = createSignal('')
   const [uploadOpen, setUploadOpen] = createSignal(false)
   const [deleteId, setDeleteId] = createSignal<string | null>(null)
@@ -40,20 +38,33 @@ function ContentPage() {
   const [uploadCategory, setUploadCategory] = createSignal('')
   const [uploadFile, setUploadFile] = createSignal<File | null>(null)
 
-  const query = createQuery(() => ({
-    queryKey: ['content'],
-    enabled: typeof window !== 'undefined',
-    queryFn: async () => {
+  const [items, setItems] = createSignal<ContentItem[]>([])
+  const [loading, setLoading] = createSignal(true)
+  const [uploading, setUploading] = createSignal(false)
+  const [deleting, setDeleting] = createSignal(false)
+
+  const fetchItems = async () => {
+    setLoading(true)
+    try {
       const res = await fetch('/api/content', { headers: authHeader() })
       if (!res.ok) throw new Error('Failed to fetch')
-      return res.json() as Promise<ContentItem[]>
-    },
-  }))
+      setItems((await res.json()) as ContentItem[])
+    } catch {
+      // silently fail — UI will show empty
+    } finally {
+      setLoading(false)
+    }
+  }
 
-  const uploadMutation = createMutation(() => ({
-    mutationFn: async () => {
-      const file = uploadFile()
-      if (!file) throw new Error('No file selected')
+  onMount(() => { fetchItems() })
+
+  const closeUpload = () => { setUploadOpen(false); setUploadName(''); setUploadCategory(''); setUploadFile(null) }
+
+  const handleUpload = async () => {
+    const file = uploadFile()
+    if (!file) return
+    setUploading(true)
+    try {
       const fd = new FormData()
       fd.append('file', file)
       fd.append('name', uploadName() || file.name)
@@ -64,23 +75,30 @@ function ContentPage() {
         body: fd,
       })
       if (!res.ok) throw new Error('Upload failed')
-      return res.json()
-    },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['content'] })
       closeUpload()
-    },
-  }))
+      await fetchItems()
+    } catch {
+      // keep dialog open on error
+    } finally {
+      setUploading(false)
+    }
+  }
 
-  const deleteMutation = createMutation(() => ({
-    mutationFn: async (id: string) => {
+  const handleDelete = async () => {
+    const id = deleteId()
+    if (!id) return
+    setDeleting(true)
+    try {
       const res = await fetch(`/api/content/${id}`, { method: 'DELETE', headers: authHeader() })
       if (!res.ok) throw new Error('Failed to delete')
-    },
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['content'] }); setDeleteId(null) },
-  }))
-
-  const closeUpload = () => { setUploadOpen(false); setUploadName(''); setUploadCategory(''); setUploadFile(null) }
+      setDeleteId(null)
+      await fetchItems()
+    } catch {
+      // keep dialog open on error
+    } finally {
+      setDeleting(false)
+    }
+  }
 
   const columns = [
     col.accessor('name', { header: 'Nama' }),
@@ -109,14 +127,14 @@ function ContentPage() {
       </div>
       <Card>
         <CardContent class="pt-6">
-          <DataTable data={query.data ?? []} columns={columns as ColumnDef<ContentItem, unknown>[]} loading={query.isLoading} globalFilter={search()} onGlobalFilterChange={setSearch} />
+          <DataTable data={items()} columns={columns as ColumnDef<ContentItem, unknown>[]} loading={loading()} globalFilter={search()} onGlobalFilterChange={setSearch} />
         </CardContent>
       </Card>
 
       <Dialog open={uploadOpen()} onClose={closeUpload}>
         <DialogContent>
           <DialogHeader><DialogTitle>Upload File</DialogTitle></DialogHeader>
-          <form onSubmit={(e) => { e.preventDefault(); uploadMutation.mutate() }} class="space-y-4">
+          <form onSubmit={(e) => { e.preventDefault(); handleUpload() }} class="space-y-4">
             <div class="flex flex-col gap-1">
               <label class="text-sm font-medium text-slate-700 dark:text-slate-300">File *</label>
               <input type="file" required onChange={(e) => { const f = e.currentTarget.files?.[0]; if (f) setUploadFile(f) }} class="text-sm text-slate-700 dark:text-slate-300" />
@@ -125,7 +143,7 @@ function ContentPage() {
             <Input label="Kategori" value={uploadCategory()} onInput={(e) => setUploadCategory(e.currentTarget.value)} />
             <DialogFooter>
               <Button type="button" variant="outline" onClick={closeUpload}>Batal</Button>
-              <Button type="submit" disabled={uploadMutation.isPending}>{uploadMutation.isPending ? 'Mengunggah...' : 'Upload'}</Button>
+              <Button type="submit" disabled={uploading()}>{uploading() ? 'Mengunggah...' : 'Upload'}</Button>
             </DialogFooter>
           </form>
         </DialogContent>
@@ -137,8 +155,8 @@ function ContentPage() {
           <p class="text-sm text-slate-600 dark:text-slate-400">File akan dihapus dari Google Drive dan database. Yakin?</p>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDeleteId(null)}>Batal</Button>
-            <Button variant="destructive" disabled={deleteMutation.isPending} onClick={() => { const id = deleteId(); if (id) deleteMutation.mutate(id) }}>
-              {deleteMutation.isPending ? 'Menghapus...' : 'Hapus'}
+            <Button variant="destructive" disabled={deleting()} onClick={handleDelete}>
+              {deleting() ? 'Menghapus...' : 'Hapus'}
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -1,8 +1,7 @@
 import { createFileRoute } from '@tanstack/solid-router'
-import { createSignal, For, Show } from 'solid-js'
-import { createQuery, createMutation, useQueryClient } from '@tanstack/solid-query'
-import { DataTable  } from '../../components/data-table/index'
-import type {ColumnDef} from '../../components/data-table/index';
+import { createSignal, For, Show, onMount } from 'solid-js'
+import { DataTable } from '../../components/data-table/index'
+import type { ColumnDef } from '../../components/data-table/index'
 import { Badge } from '../../components/ui/badge'
 import { Button } from '../../components/ui/button'
 import { authHeader } from '../../contexts/auth'
@@ -36,7 +35,6 @@ function fetchJson<T>(url: string): Promise<T> {
 const PERMISSIONS = ['wa_connect', 'wa_send', 'wa_blast', 'templates', 'chatbot', 'content', 'api_keys', 'users']
 
 function UsersPage() {
-  const qc = useQueryClient()
   const [tab, setTab] = createSignal<'users' | 'roles'>('users')
   const [showRoleDialog, setShowRoleDialog] = createSignal(false)
   const [editRole, setEditRole] = createSignal<Role | null>(null)
@@ -45,20 +43,44 @@ function UsersPage() {
     Object.fromEntries(PERMISSIONS.map((p) => [p, false]))
   )
 
-  const usersQuery = createQuery(() => ({
-    queryKey: ['users'],
-    enabled: typeof window !== 'undefined',
-    queryFn: () => fetchJson<User[]>('/api/users'),
-  }))
+  const [users, setUsers] = createSignal<User[]>([])
+  const [usersLoading, setUsersLoading] = createSignal(true)
+  const [roles, setRoles] = createSignal<Role[]>([])
+  const [rolesLoading, setRolesLoading] = createSignal(true)
+  const [savingRole, setSavingRole] = createSignal(false)
 
-  const rolesQuery = createQuery(() => ({
-    queryKey: ['roles'],
-    enabled: typeof window !== 'undefined',
-    queryFn: () => fetchJson<Role[]>('/api/users/roles'),
-  }))
+  const fetchUsers = async () => {
+    setUsersLoading(true)
+    try {
+      const data = await fetchJson<User[]>('/api/users')
+      setUsers(data)
+    } catch {
+      // ignore
+    } finally {
+      setUsersLoading(false)
+    }
+  }
 
-  const saveRoleMutation = createMutation(() => ({
-    mutationFn: async (data: { name: string; permissions: Record<string, boolean> }) => {
+  const fetchRoles = async () => {
+    setRolesLoading(true)
+    try {
+      const data = await fetchJson<Role[]>('/api/users/roles')
+      setRoles(data)
+    } catch {
+      // ignore
+    } finally {
+      setRolesLoading(false)
+    }
+  }
+
+  onMount(() => {
+    fetchUsers()
+    fetchRoles()
+  })
+
+  const saveRole = async (data: { name: string; permissions: Record<string, boolean> }) => {
+    setSavingRole(true)
+    try {
       const role = editRole()
       const url = role ? `/api/users/roles/${role.id}` : '/api/users/roles'
       const method = role ? 'PUT' : 'POST'
@@ -68,22 +90,25 @@ function UsersPage() {
         body: JSON.stringify(data),
       })
       if (!res.ok) throw new Error('Failed')
-      return res.json()
-    },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['roles'] })
       setShowRoleDialog(false)
       setEditRole(null)
-    },
-  }))
+      await fetchRoles()
+    } catch {
+      // ignore
+    } finally {
+      setSavingRole(false)
+    }
+  }
 
-  const deleteRoleMutation = createMutation(() => ({
-    mutationFn: async (id: string) => {
+  const deleteRole = async (id: string) => {
+    try {
       const res = await fetch(`/api/users/roles/${id}`, { method: 'DELETE', headers: authHeader() })
       if (!res.ok) throw new Error('Failed')
-    },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['roles'] }),
-  }))
+      await fetchRoles()
+    } catch {
+      // ignore
+    }
+  }
 
   const openCreate = () => {
     setEditRole(null)
@@ -131,7 +156,7 @@ function UsersPage() {
       cell: (info) => (
         <div class="flex gap-2">
           <Button size="sm" variant="outline" onClick={() => openEdit(info.row.original)}>Edit</Button>
-          <Button size="sm" variant="destructive" onClick={() => { if (confirm('Hapus role ini?')) deleteRoleMutation.mutate(info.row.original.id) }}>Hapus</Button>
+          <Button size="sm" variant="destructive" onClick={() => { if (confirm('Hapus role ini?')) deleteRole(info.row.original.id) }}>Hapus</Button>
         </div>
       ),
     },
@@ -155,10 +180,10 @@ function UsersPage() {
       </div>
 
       <Show when={tab() === 'users'}>
-        <DataTable data={usersQuery.data ?? []} columns={userColumns} loading={usersQuery.isLoading} />
+        <DataTable data={users()} columns={userColumns} loading={usersLoading()} />
       </Show>
       <Show when={tab() === 'roles'}>
-        <DataTable data={rolesQuery.data ?? []} columns={roleColumns} loading={rolesQuery.isLoading} />
+        <DataTable data={roles()} columns={roleColumns} loading={rolesLoading()} />
       </Show>
 
       <Show when={showRoleDialog()}>
@@ -183,7 +208,7 @@ function UsersPage() {
               </div>
               <div class="flex justify-end gap-2">
                 <Button variant="outline" onClick={() => setShowRoleDialog(false)}>Batal</Button>
-                <Button onClick={() => saveRoleMutation.mutate({ name: roleName(), permissions: rolePerms() })} disabled={saveRoleMutation.isPending}>Simpan</Button>
+                <Button onClick={() => saveRole({ name: roleName(), permissions: rolePerms() })} disabled={savingRole()}>Simpan</Button>
               </div>
             </div>
           </div>

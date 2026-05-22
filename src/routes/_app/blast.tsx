@@ -1,6 +1,5 @@
 import { createFileRoute } from '@tanstack/solid-router'
-import { createSignal, Show } from 'solid-js'
-import { createQuery, createMutation, useQueryClient } from '@tanstack/solid-query'
+import { createSignal, Show, onMount, onCleanup } from 'solid-js'
 import { DataTable  } from '../../components/data-table/index'
 import type {ColumnDef} from '../../components/data-table/index';
 import { Badge } from '../../components/ui/badge'
@@ -49,27 +48,40 @@ function estimateFinish(total: number, sent: number): string {
 }
 
 function BlastPage() {
-  const qc = useQueryClient()
   const [showCreate, setShowCreate] = createSignal(false)
+  const [jobs, setJobs] = createSignal<BlastJob[]>([])
+  const [loading, setLoading] = createSignal(true)
 
-  const jobsQuery = createQuery(() => ({
-    queryKey: ['blast-jobs'],
-    enabled: typeof window !== 'undefined',
-    queryFn: () => fetchJson<BlastJob[]>('/api/blast'),
-    refetchInterval: 8000,
-  }))
+  const fetchJobs = async () => {
+    try {
+      const data = await fetchJson<BlastJob[]>('/api/blast')
+      setJobs(data)
+    } catch {
+      // keep existing data on error
+    } finally {
+      setLoading(false)
+    }
+  }
 
-  const actionMutation = createMutation(() => ({
-    mutationFn: async ({ id, action }: { id: string; action: string }) => {
+  const doAction = async (id: string, action: string) => {
+    try {
       const res = await fetch(`/api/blast/${id}/${action}`, {
         method: 'POST',
         headers: authHeader(),
       })
       if (!res.ok) throw new Error('Action failed')
-      return res.json()
-    },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['blast-jobs'] }),
-  }))
+      await res.json()
+      fetchJobs()
+    } catch {
+      // action failed silently
+    }
+  }
+
+  onMount(() => {
+    fetchJobs()
+    const interval = setInterval(fetchJobs, 8000)
+    onCleanup(() => clearInterval(interval))
+  })
 
   const columns: ColumnDef<BlastJob>[] = [
     { accessorKey: 'name', header: 'Nama Job' },
@@ -116,16 +128,16 @@ function BlastPage() {
         return (
           <div class="flex gap-1">
             <Show when={row.status === 'draft' || row.status === 'queued'}>
-              <Button size="sm" onClick={() => actionMutation.mutate({ id: row.id, action: 'start' })}>Start</Button>
+              <Button size="sm" onClick={() => doAction(row.id, 'start')}>Start</Button>
             </Show>
             <Show when={row.status === 'running'}>
-              <Button size="sm" variant="outline" onClick={() => actionMutation.mutate({ id: row.id, action: 'pause' })}>Pause</Button>
+              <Button size="sm" variant="outline" onClick={() => doAction(row.id, 'pause')}>Pause</Button>
             </Show>
             <Show when={row.status === 'paused'}>
-              <Button size="sm" onClick={() => actionMutation.mutate({ id: row.id, action: 'resume' })}>Resume</Button>
+              <Button size="sm" onClick={() => doAction(row.id, 'resume')}>Resume</Button>
             </Show>
             <Show when={row.status === 'running' || row.status === 'paused' || row.status === 'queued'}>
-              <Button size="sm" variant="destructive" onClick={() => actionMutation.mutate({ id: row.id, action: 'cancel' })}>Cancel</Button>
+              <Button size="sm" variant="destructive" onClick={() => doAction(row.id, 'cancel')}>Cancel</Button>
             </Show>
           </div>
         )
@@ -144,13 +156,13 @@ function BlastPage() {
       </div>
 
       <DataTable
-        data={jobsQuery.data ?? []}
+        data={jobs()}
         columns={columns}
-        loading={jobsQuery.isLoading}
+        loading={loading()}
       />
 
       <Show when={showCreate()}>
-        <CreateBlastDialog onClose={() => setShowCreate(false)} onSuccess={() => { setShowCreate(false); qc.invalidateQueries({ queryKey: ['blast-jobs'] }) }} />
+        <CreateBlastDialog onClose={() => setShowCreate(false)} onSuccess={() => { setShowCreate(false); fetchJobs() }} />
       </Show>
     </div>
   )

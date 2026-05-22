@@ -1,6 +1,5 @@
 import { createFileRoute } from '@tanstack/solid-router'
-import { createSignal, For, Show } from 'solid-js'
-import { createQuery, createMutation, useQueryClient } from '@tanstack/solid-query'
+import { createSignal, For, onCleanup, onMount, Show } from 'solid-js'
 import { Badge } from '../../components/ui/badge'
 import { Button } from '../../components/ui/button'
 import { authHeader } from '../../contexts/auth'
@@ -38,45 +37,78 @@ function fetchJson<T>(url: string): Promise<T> {
 }
 
 function InboxPage() {
-  const queryClient = useQueryClient()
   const [selectedContact, setSelectedContact] = createSignal<string | null>(null)
   const [messageText, setMessageText] = createSignal('')
+  const [contacts, setContacts] = createSignal<Contact[]>([])
+  const [contactsLoading, setContactsLoading] = createSignal(true)
+  const [conversation, setConversation] = createSignal<Message[]>([])
+  const [conversationLoading, setConversationLoading] = createSignal(false)
+  const [sendPending, setSendPending] = createSignal(false)
 
-  const contactsQuery = createQuery(() => ({
-    queryKey: ['contacts'],
-    enabled: typeof window !== 'undefined',
-    queryFn: () => fetchJson<Contact[]>('/api/messages/contacts'),
-    refetchInterval: 10000,
-  }))
+  const loadContacts = async () => {
+    try {
+      const data = await fetchJson<Contact[]>('/api/messages/contacts')
+      setContacts(data)
+    } finally {
+      setContactsLoading(false)
+    }
+  }
 
-  const conversationQuery = createQuery(() => ({
-    queryKey: ['conversation', selectedContact()],
-    queryFn: () => fetchJson<Message[]>(`/api/messages/conversation/${selectedContact()}`),
-    enabled: typeof window !== 'undefined' && (!!selectedContact()),
-    refetchInterval: 5000,
-  }))
+  const loadConversation = async (phone = selectedContact()) => {
+    if (!phone) {
+      setConversation([])
+      return
+    }
+    setConversationLoading(true)
+    try {
+      const data = await fetchJson<Message[]>(`/api/messages/conversation/${phone}`)
+      if (selectedContact() === phone) setConversation(data)
+    } finally {
+      if (selectedContact() === phone) setConversationLoading(false)
+    }
+  }
 
-  const sendMutation = createMutation(() => ({
-    mutationFn: async (data: { to: string; message: string }) => {
+  onMount(() => {
+    void loadContacts()
+
+    const contactsInterval = window.setInterval(() => void loadContacts(), 10000)
+    const conversationInterval = window.setInterval(() => {
+      if (selectedContact()) void loadConversation()
+    }, 5000)
+
+    onCleanup(() => {
+      window.clearInterval(contactsInterval)
+      window.clearInterval(conversationInterval)
+    })
+  })
+
+  const sendMessage = async (data: { to: string; message: string }) => {
+    setSendPending(true)
+    try {
       const res = await fetch('/api/messages/send', {
         method: 'POST',
         headers: { ...authHeader(), 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
       })
       if (!res.ok) throw new Error('Failed to send')
-      return res.json()
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['conversation', selectedContact()] })
+      await res.json()
+      await loadConversation(data.to)
       setMessageText('')
-    },
-  }))
+    } finally {
+      setSendPending(false)
+    }
+  }
+
+  const handleSelectContact = (phone: string) => {
+    setSelectedContact(phone)
+    void loadConversation(phone)
+  }
 
   const handleSend = () => {
     const phone = selectedContact()
     const msg = messageText().trim()
     if (!phone || !msg) return
-    sendMutation.mutate({ to: phone, message: msg })
+    void sendMessage({ to: phone, message: msg })
   }
 
   return (
@@ -88,12 +120,12 @@ function InboxPage() {
             <h2 class="text-lg font-semibold text-gray-900 dark:text-white">Inbox</h2>
           </div>
           <div class="flex-1 overflow-y-auto">
-            <Show when={!contactsQuery.isLoading} fallback={<LoadingSkeleton />}>
-              <For each={contactsQuery.data ?? []}>
+            <Show when={!contactsLoading()} fallback={<LoadingSkeleton />}>
+              <For each={contacts()}>
                 {(contact) => (
                   <button
                     type="button"
-                    onClick={() => setSelectedContact(contact.phoneNumber)}
+                    onClick={() => handleSelectContact(contact.phoneNumber)}
                     class={`flex w-full items-center gap-3 border-b border-gray-100 px-4 py-3 text-left transition-colors hover:bg-gray-50 dark:border-gray-800 dark:hover:bg-gray-800 ${selectedContact() === contact.phoneNumber ? 'bg-green-50 dark:bg-green-900/20' : ''}`}
                   >
                     <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-green-100 text-sm font-medium text-green-700 dark:bg-green-900 dark:text-green-300">
@@ -130,9 +162,9 @@ function InboxPage() {
 
             {/* Messages */}
             <div class="flex-1 overflow-y-auto bg-gray-100 p-4 dark:bg-gray-900">
-              <Show when={!conversationQuery.isLoading} fallback={<LoadingSkeleton />}>
+              <Show when={!conversationLoading()} fallback={<LoadingSkeleton />}>
                 <div class="flex flex-col gap-2">
-                  <For each={conversationQuery.data ?? []}>
+                  <For each={conversation()}>
                     {(msg) => (
                       <div class={`flex ${msg.direction === 'outbound' ? 'justify-end' : 'justify-start'}`}>
                         <div class={`max-w-[70%] rounded-lg px-3 py-2 text-sm ${msg.direction === 'outbound' ? 'bg-green-500 text-white' : 'bg-white text-gray-900 dark:bg-gray-800 dark:text-white'}`}>
@@ -163,7 +195,7 @@ function InboxPage() {
                 placeholder="Ketik pesan..."
                 class="flex-1 rounded-full border border-gray-300 bg-gray-50 px-4 py-2 text-sm text-gray-900 focus:border-green-500 focus:outline-none dark:border-gray-600 dark:bg-gray-900 dark:text-white"
               />
-              <Button onClick={handleSend} disabled={!messageText().trim() || sendMutation.isPending} size="icon" class="rounded-full bg-green-600 hover:bg-green-700">
+              <Button onClick={handleSend} disabled={!messageText().trim() || sendPending()} size="icon" class="rounded-full bg-green-600 hover:bg-green-700">
                 <svg class="h-5 w-5" viewBox="0 0 24 24" fill="currentColor"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" /></svg>
               </Button>
             </div>
