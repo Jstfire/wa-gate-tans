@@ -36,8 +36,8 @@ type RuntimeQr = {
   error?: string
 }
 
-function fetchJson<T>(url: string): Promise<T> {
-  return fetch(url, { headers: authHeader() }).then(async (res) => {
+function fetchJson<T>(url: string, init: RequestInit = {}): Promise<T> {
+  return fetch(url, { ...init, headers: { ...authHeader(), ...(init.headers ?? {}) } }).then(async (res) => {
     const text = await res.text()
     const data = text ? JSON.parse(text) as T : {} as T
     if (!res.ok) throw new Error('error' in (data as Record<string, unknown>) ? String((data as { error?: unknown }).error) : 'Request failed')
