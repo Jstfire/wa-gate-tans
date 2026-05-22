@@ -8,7 +8,7 @@ import type { ClientInfo, Message as WaMessage } from 'whatsapp-web.js'
 
 const { Client, LocalAuth } = pkg
 
-type WaStatus = 'disconnected' | 'initializing' | 'qr_pending' | 'connected' | 'error'
+type WaStatus = 'disconnected' | 'initializing' | 'qr_pending' | 'authenticated' | 'connected' | 'error'
 
 type RuntimeConfig = {
   port: number
@@ -162,6 +162,7 @@ async function startClient(): Promise<void> {
   })
 
   client.on('qr', (qr: string) => {
+    if (state.status === 'authenticated' || state.status === 'connected') return
     state.qrRaw = qr
     touch('qr_pending')
     console.log('[WA-RUNTIME] QR received')
@@ -176,6 +177,8 @@ async function startClient(): Promise<void> {
   })
 
   client.on('authenticated', () => {
+    state.qrRaw = null
+    touch('authenticated')
     console.log('[WA-RUNTIME] Authenticated')
   })
 

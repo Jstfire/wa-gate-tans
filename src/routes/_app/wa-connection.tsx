@@ -31,7 +31,7 @@ function WaConnectionPage() {
       const data = await fetchWithAuth('/api/wa/status')
       setStatusData(data)
 
-      if (data.status === 'connected') {
+      if (data.status === 'connected' || data.status === 'authenticated') {
         setQrData(null)
         return
       }
@@ -56,6 +56,13 @@ function WaConnectionPage() {
 
   onMount(() => {
     void refreshStatus({ includeQr: true })
+    const interval = window.setInterval(() => {
+      const current = status()
+      if (current === 'qr_pending' || current === 'authenticated' || current === 'initializing') {
+        void refreshStatus({ includeQr: false })
+      }
+    }, 5000)
+    return () => window.clearInterval(interval)
   })
 
   const handleConnect = async () => {
@@ -86,7 +93,7 @@ function WaConnectionPage() {
         <CardHeader>
           <div class="flex items-center justify-between">
             <p class="text-sm font-medium text-gray-700 dark:text-gray-300">Connection Status</p>
-            <Badge variant={status() === 'connected' ? 'success' : status() === 'connecting' || status() === 'qr_pending' || status() === 'initializing' ? 'warning' : 'destructive'}>
+            <Badge variant={status() === 'connected' || status() === 'authenticated' ? 'success' : status() === 'connecting' || status() === 'qr_pending' || status() === 'initializing' ? 'warning' : 'destructive'}>
               {status()}
             </Badge>
           </div>
@@ -107,7 +114,7 @@ function WaConnectionPage() {
           </Show>
 
           <div class="flex flex-wrap gap-3">
-            <Show when={status() !== 'connected'}>
+            <Show when={status() !== 'connected' && status() !== 'authenticated'}>
               <Button onClick={handleConnect} disabled={connecting() || status() === 'connecting' || status() === 'initializing'}>
                 {connecting() ? 'Connecting...' : 'Connect'}
               </Button>
@@ -115,7 +122,7 @@ function WaConnectionPage() {
                 {refreshingQr() ? 'Refreshing...' : 'Refresh QR'}
               </Button>
             </Show>
-            <Show when={status() === 'connected'}>
+            <Show when={status() === 'connected' || status() === 'authenticated'}>
               <Button variant="destructive" onClick={handleDisconnect}>
                 Disconnect
               </Button>
