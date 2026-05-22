@@ -58,7 +58,7 @@
 
 ## Current Task
 - UI overhaul in progress: dashboard/shell redesigned with glassmorphic command-center look; sidebar Inbox now opens `/inbox-live` in a new tab.
-- Added standalone WhatsApp Web-like Inbox layout at `/inbox-live` with full-height dark chat UI, contact list, bubbles, search, and send box.
+- Added standalone WhatsApp Web-like Inbox layout at `/inbox-live` with full-height dark chat UI, contact list, bubbles, search, and send box. Fixed SSR 1101 by removing TanStack Query from standalone SSR route and loading contacts/messages on client mount only. QA screenshots captured for desktop/mobile dark/light dashboard and inbox-live.
 - ✅ API production stabilized: 11/11 endpoints HTTP 200 with valid token.
 - ✅ Backend QA smoke tests completed: auth guard, templates CRUD, API keys create/revoke, officers CRUD, blast create/cancel.
 - ✅ Desktop frontend QA completed: login flow, dashboard light mode, dashboard dark mode.
