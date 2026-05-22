@@ -2,6 +2,7 @@ import { Hono } from 'hono'
 import { authMiddleware } from '../middleware/auth'
 import { requirePermission } from '../middleware/permission'
 import { getWagateClient } from '../../lib/supabase-rest'
+import { sendViaRuntime } from './wa-runtime'
 
 interface MessageRow {
   id: string
@@ -82,21 +83,28 @@ messages.post('/send', requirePermission('wa_send'), async (c) => {
       return c.json({ error: 'Field "message" is required' }, 400)
     }
 
+    const to = body.to.trim()
+    const message = body.message.trim()
+    const runtimeResult = await sendViaRuntime(to, message)
+    if (!runtimeResult.success) {
+      return c.json({ error: runtimeResult.error ?? 'Failed to send message via WA runtime' }, 502)
+    }
+
     const ourNumber = process.env.WA_NUMBER ?? 'system'
-    const tempId = `pending_${crypto.randomUUID()}`
+    const messageId = runtimeResult.result?.messageId ?? `out_${crypto.randomUUID()}`
 
     const [row] = await client.insert<MessageRow>('messages_wagate', {
-      wa_message_id: tempId,
+      wa_message_id: messageId,
       from_number: ourNumber,
-      to_number: body.to.trim(),
-      content: body.message.trim(),
+      to_number: to,
+      content: message,
       direction: 'outbound',
-      status: 'pending',
+      status: 'sent',
     })
 
-    return c.json(row, 201)
-  } catch {
-    return c.json({ error: 'Failed to save message' }, 500)
+    return c.json({ ...row, runtime: runtimeResult.result }, 201)
+  } catch (error) {
+    return c.json({ error: error instanceof Error ? error.message : 'Failed to send message' }, 500)
   }
 })
 

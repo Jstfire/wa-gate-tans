@@ -9,6 +9,7 @@ import blast from './routes/blast'
 import content from './routes/content'
 import apiKeys from './routes/api-keys'
 import waAccounts from './routes/wa-accounts'
+import waRuntime from './routes/wa-runtime'
 import users from './routes/users'
 
 const api = new Hono().basePath('/api')
@@ -28,6 +29,7 @@ api.route('/blast', blast)
 api.route('/content', content)
 api.route('/api-keys', apiKeys)
 api.route('/wa-accounts', waAccounts)
+api.route('/wa', waRuntime)
 api.route('/users', users)
 api.route('/roles', users)
 

@@ -25,9 +25,11 @@ function WaConnectionPage() {
     try {
       const data = await fetchWithAuth('/api/wa/status')
       setStatusData(data)
-      if (data.status === 'connecting') {
+      if (data.status === 'connecting' || data.status === 'qr_pending' || data.hasQr === true) {
         const qr = await fetchWithAuth('/api/wa/qr')
         setQrData(qr)
+      } else {
+        setQrData(null)
       }
     } catch {
       setStatusData({ status: 'unknown' })
@@ -68,28 +70,28 @@ function WaConnectionPage() {
         <CardHeader>
           <div class="flex items-center justify-between">
             <p class="text-sm font-medium text-gray-700 dark:text-gray-300">Connection Status</p>
-            <Badge variant={status() === 'connected' ? 'success' : status() === 'connecting' ? 'warning' : 'destructive'}>
+            <Badge variant={status() === 'connected' ? 'success' : status() === 'connecting' || status() === 'qr_pending' || status() === 'initializing' ? 'warning' : 'destructive'}>
               {status()}
             </Badge>
           </div>
         </CardHeader>
         <CardContent class="flex flex-col gap-4">
-          <Show when={statusData()?.phoneNumber}>
+          <Show when={(statusData()?.account as { wid?: string; pushname?: string } | null)?.wid}>
             <p class="text-sm text-gray-600 dark:text-gray-400">
-              Connected as: <span class="font-medium text-gray-900 dark:text-white">{statusData()?.phoneNumber as string}</span>
+              Connected as: <span class="font-medium text-gray-900 dark:text-white">{(statusData()?.account as { wid?: string; pushname?: string } | null)?.wid}</span>
             </p>
           </Show>
 
-          <Show when={status() === 'connecting' && qrData()?.qrCode}>
+          <Show when={qrData()?.qr}>
             <div class="flex flex-col items-center gap-3 rounded-lg border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-800">
               <p class="text-sm text-gray-600 dark:text-gray-400">Scan QR code with WhatsApp</p>
-              <img src={`data:image/png;base64,${qrData()?.qrCode as string}`} alt="QR Code" class="h-64 w-64" />
+              <img src={qrData()?.qr as string} alt="QR Code" class="h-64 w-64" />
             </div>
           </Show>
 
           <div class="flex gap-3">
             <Show when={status() !== 'connected'}>
-              <Button onClick={handleConnect} disabled={connecting() || status() === 'connecting'}>
+              <Button onClick={handleConnect} disabled={connecting() || status() === 'connecting' || status() === 'initializing'}>
                 {connecting() ? 'Connecting...' : 'Connect'}
               </Button>
             </Show>

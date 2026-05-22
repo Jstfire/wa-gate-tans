@@ -78,9 +78,12 @@ curl https://wa-gate.buseldata.com/api/health
   - `.env.example`: required runtime env.
 - Required Northflank volume mount: `/data` for `/data/wwebjs_auth` and `/data/wwebjs_cache`.
 - Required env: `PORT=8787`, `WA_RUNTIME_API_KEY`, `WA_GATE_ORIGIN`, `WA_RUNTIME_AUTO_START=true`, `WWEBJS_AUTH_PATH=/data/wwebjs_auth`, `WWEBJS_CACHE_PATH=/data/wwebjs_cache`, `PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium`.
-- Runtime endpoint auth: `Authorization: Bearer <WA_RUNTIME_API_KEY>` for `/api/*`; `/health` is public.
+- Runtime endpoint auth: `Authorization: Bearer <WA_RU...EY>` for `/api/*`; `/health` is public.
+- Active runtime URL: `https://p01--wa-gate-run--gp5472lgpk5w.code.run`.
+- Cloudflare Worker secrets uploaded with Wrangler: `WA_RUNTIME_URL`, `WA_RUNTIME_API_KEY`.
+- WA Gate API proxy routes: `/api/wa/status`, `/api/wa/qr`, `/api/wa/connect`, `/api/wa/disconnect`; `/api/messages/send` sends through the Northflank runtime.
 - Anti-ban: `/api/send` implements human-like typing (`sendStateTyping`, duration based on message length, `clearState` in `finally`, micro-delay 1-3s). Blast queue still must enforce 60-90s delay between recipients before calling runtime send.
-- Validation: `cd wa-runtime && bun install && bun run typecheck` passes.
+- Validation: `cd wa-runtime && bun install && bun run typecheck` passes; production `/api/wa/status` and `/api/wa/qr` return `qr_pending` with QR present via Cloudflare proxy.
 
 ## Post-deployment Verification
 
