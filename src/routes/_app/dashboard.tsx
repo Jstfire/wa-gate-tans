@@ -72,7 +72,7 @@ function DashboardPage() {
             <h1 class="mt-5 max-w-3xl text-3xl font-semibold tracking-tight md:text-5xl">WA Gate BPS Kabupaten Buton Selatan</h1>
             <p class="mt-4 max-w-2xl text-sm leading-6 text-slate-300 md:text-base">Command center untuk koneksi WhatsApp, inbox real-time, chatbot, template, API key, dan blast queue dengan anti-ban delay.</p>
           </div>
-          <div class="grid grid-cols-2 gap-3 rounded-3xl border border-white/10 bg-white/10 p-3 backdrop-blur">
+            <div class="grid grid-cols-2 gap-3 rounded-3xl border border-white/15 bg-slate-950/35 p-3 shadow-inner backdrop-blur">
             <MiniMetric label="Inbox hari ini" value={loading() ? '...' : stats().messagesToday} />
             <MiniMetric label="Template aktif" value={loading() ? '...' : stats().templates} />
             <MiniMetric label="Blast aktif" value={loading() ? '...' : stats().activeBlast} />
@@ -125,7 +125,7 @@ function DashboardPage() {
 }
 
 function MiniMetric(props: { label: string; value: string | number }) {
-  return <div class="rounded-2xl bg-slate-950/30 p-3"><p class="text-xs text-slate-300">{props.label}</p><p class="mt-1 text-xl font-semibold text-white">{props.value}</p></div>
+  return <div class="min-w-0 rounded-2xl bg-white/10 p-3 ring-1 ring-white/10"><p class="text-xs text-slate-300">{props.label}</p><p class="mt-1 break-words text-lg font-semibold text-white">{props.value}</p></div>
 }
 
 function StatCard(props: { title: string; value: string | number; detail: string; tone: 'emerald' | 'blue' | 'violet' | 'amber' }) {
@@ -135,7 +135,7 @@ function StatCard(props: { title: string; value: string | number; detail: string
       <CardContent class="p-5">
         <div class={`mb-5 h-1.5 w-16 rounded-full bg-gradient-to-r ${tone()}`} />
         <p class="text-sm font-medium text-slate-500 dark:text-slate-400">{props.title}</p>
-        <p class="mt-2 truncate text-3xl font-semibold tracking-tight text-slate-950 dark:text-white">{props.value}</p>
+        <p class="mt-2 break-words text-2xl font-semibold tracking-tight text-slate-950 dark:text-white xl:text-3xl">{props.value}</p>
         <p class="mt-3 text-xs leading-5 text-slate-500 dark:text-slate-400">{props.detail}</p>
       </CardContent>
     </Card>
