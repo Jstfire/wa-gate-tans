@@ -34,11 +34,17 @@ const waRuntime = new Hono()
 
 waRuntime.use('*', authMiddleware)
 
-function runtimeConfig(): { urls: string[]; key: string } {
-  const primary = process.env.WA_RUNTIME_PRIMARY_URL?.replace(/\/+$/, '') || process.env.WA_RUNTIME_URL?.replace(/\/+$/, '') || ''
-  const backup = process.env.WA_RUNTIME_BACKUP_URL?.replace(/\/+$/, '') || ''
-  const urls = [primary, backup].filter((url, index, arr) => url && arr.indexOf(url) === index)
-  const key = process.env.WA_RUNTIME_API_KEY ?? ''
+type RuntimeEnv = Record<string, string | undefined>
+
+function envValue(env: RuntimeEnv | undefined, key: string): string {
+  return env?.[key] ?? process.env[key] ?? ''
+}
+
+function runtimeConfig(env?: RuntimeEnv): { urls: string[]; key: string } {
+  const primary = envValue(env, 'WA_RUNTIME_PRIMARY_URL').replace(/\/+$/, '') || envValue(env, 'WA_RUNTIME_URL').replace(/\/+$/, '') || ''
+  const backup = envValue(env, 'WA_RUNTIME_BACKUP_URL').replace(/\/+$/, '') || ''
+  const urls = [primary, backup].filter((url, index, arr): url is string => Boolean(url) && arr.indexOf(url) === index)
+  const key = envValue(env, 'WA_RUNTIME_API_KEY')
   if (urls.length === 0 || !key) throw new Error('WA runtime is not configured')
   return { urls, key }
 }
@@ -66,8 +72,8 @@ async function runtimeFetchFrom<T>(url: string, key: string, path: string, init:
   }
 }
 
-async function runtimeFetch<T>(path: string, init: RequestInit = {}): Promise<T> {
-  const { urls, key } = runtimeConfig()
+async function runtimeFetch<T>(path: string, init: RequestInit = {}, env?: RuntimeEnv): Promise<T> {
+  const { urls, key } = runtimeConfig(env)
   const timeoutMs = path === '/api/send' ? 45_000 : path === '/api/qr' ? 12_000 : 8_000
   let lastError: unknown = null
   for (const url of urls) {
@@ -79,7 +85,7 @@ async function runtimeFetch<T>(path: string, init: RequestInit = {}): Promise<T>
 
 waRuntime.get('/status', requirePermission('wa_connect'), async (c) => {
   try {
-    const data = await runtimeFetch<RuntimeStatus>('/api/status')
+    const data = await runtimeFetch<RuntimeStatus>('/api/status', {}, c.env)
     return c.json(data)
   } catch (error) {
     return c.json({ status: 'error', error: error instanceof Error ? error.message : 'Failed to reach WA runtime' }, 502)
@@ -88,7 +94,7 @@ waRuntime.get('/status', requirePermission('wa_connect'), async (c) => {
 
 waRuntime.get('/qr', requirePermission('wa_connect'), async (c) => {
   try {
-    const data = await runtimeFetch<RuntimeQr>('/api/qr')
+    const data = await runtimeFetch<RuntimeQr>('/api/qr', {}, c.env)
     return c.json(data)
   } catch (error) {
     return c.json({ status: 'error', qr: null, raw: null, error: error instanceof Error ? error.message : 'Failed to fetch QR' }, 502)
@@ -97,7 +103,7 @@ waRuntime.get('/qr', requirePermission('wa_connect'), async (c) => {
 
 waRuntime.post('/connect', requirePermission('wa_connect'), async (c) => {
   try {
-    const data = await runtimeFetch<RuntimeStatus>('/api/connect', { method: 'POST' })
+    const data = await runtimeFetch<RuntimeStatus>('/api/connect', { method: 'POST' }, c.env)
     return c.json(data)
   } catch (error) {
     return c.json({ status: 'error', error: error instanceof Error ? error.message : 'Failed to connect WA runtime' }, 502)
@@ -106,7 +112,7 @@ waRuntime.post('/connect', requirePermission('wa_connect'), async (c) => {
 
 waRuntime.post('/disconnect', requirePermission('wa_connect'), async (c) => {
   try {
-    const data = await runtimeFetch<RuntimeStatus>('/api/disconnect', { method: 'POST' })
+    const data = await runtimeFetch<RuntimeStatus>('/api/disconnect', { method: 'POST' }, c.env)
     return c.json(data)
   } catch (error) {
     return c.json({ status: 'error', error: error instanceof Error ? error.message : 'Failed to disconnect WA runtime' }, 502)
