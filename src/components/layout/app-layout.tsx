@@ -19,7 +19,7 @@ export const AppLayout: ParentComponent = (props) => {
 
   return (
     <ToastProvider>
-      <div class="flex h-screen overflow-hidden bg-gray-50 dark:bg-gray-950">
+      <div class="flex h-screen overflow-hidden bg-[radial-gradient(circle_at_top_left,#dcfce7_0,transparent_34%),linear-gradient(135deg,#f8fafc_0%,#ecfdf5_55%,#eef2ff_100%)] dark:bg-[radial-gradient(circle_at_top_left,rgba(34,197,94,0.18)_0,transparent_32%),linear-gradient(135deg,#020617_0%,#0f172a_55%,#052e1a_100%)]">
         {/* Mobile overlay */}
         <Show when={mobileOpen()}>
           <div
@@ -41,7 +41,7 @@ export const AppLayout: ParentComponent = (props) => {
         {/* Main area */}
         <div class="flex flex-1 flex-col overflow-hidden">
           <Header onToggleSidebar={toggleSidebar} />
-          <main class="flex-1 overflow-y-auto p-6">
+          <main class="flex-1 overflow-y-auto p-4 md:p-6">
             {props.children}
           </main>
         </div>

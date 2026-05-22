@@ -52,10 +52,10 @@ export function Header(props: HeaderProps) {
   }
 
   const btnBase =
-    'rounded-md p-2 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-white'
+    'rounded-xl border border-gray-200/70 bg-white/70 p-2 text-gray-500 shadow-sm backdrop-blur transition-colors hover:bg-white hover:text-gray-900 dark:border-white/10 dark:bg-white/5 dark:text-gray-300 dark:hover:bg-white/10 dark:hover:text-white'
 
   return (
-    <header class="flex h-16 items-center justify-between border-b border-gray-200 bg-white px-4 dark:border-gray-700 dark:bg-gray-900">
+    <header class="mx-4 mt-4 flex h-16 items-center justify-between rounded-2xl border border-white/70 bg-white/75 px-4 shadow-[0_20px_60px_-40px_rgba(15,23,42,0.7)] backdrop-blur-xl dark:border-white/10 dark:bg-slate-950/55">
       <button
         type="button"
         class={btnBase}
@@ -75,8 +75,8 @@ export function Header(props: HeaderProps) {
           {theme() === 'dark' ? <IconSun /> : <IconMoon />}
         </button>
 
-        <div class="flex items-center gap-2 rounded-md px-3 py-1.5 text-sm text-gray-700 dark:text-gray-300">
-          <div class="flex h-7 w-7 items-center justify-center rounded-full bg-green-100 text-xs font-semibold text-green-700 dark:bg-green-900/40 dark:text-green-400">
+        <div class="flex items-center gap-2 rounded-2xl border border-gray-200/70 bg-white/70 px-3 py-1.5 text-sm text-gray-700 shadow-sm dark:border-white/10 dark:bg-white/5 dark:text-gray-300">
+          <div class="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-emerald-500 to-teal-500 text-xs font-semibold text-white shadow-lg shadow-emerald-500/20">
             {(user()?.name ?? user()?.username ?? 'U').charAt(0).toUpperCase()}
           </div>
           <span class="hidden sm:block">{user()?.name ?? user()?.username ?? 'User'}</span>

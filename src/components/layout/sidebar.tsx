@@ -1,4 +1,4 @@
-import { Link, useLocation } from '@tanstack/solid-router'
+import { useLocation } from '@tanstack/solid-router'
 import { For  } from 'solid-js'
 import type {JSX} from 'solid-js'
 import { cn } from '../../lib/cn'
@@ -7,6 +7,7 @@ type NavItem = {
   label: string
   href: string
   icon: JSX.Element
+  external?: boolean
 }
 
 const IconHome = () => (
@@ -77,7 +78,7 @@ const IconCog = () => (
 const navItems: NavItem[] = [
   { label: 'Dashboard', href: '/dashboard', icon: <IconHome /> },
   { label: 'WA Connection', href: '/wa-connection', icon: <IconPhone /> },
-  { label: 'Inbox', href: '/inbox', icon: <IconChat /> },
+  { label: 'Inbox', href: '/inbox-live', icon: <IconChat />, external: true },
   { label: 'Templates', href: '/templates', icon: <IconDocument /> },
   { label: 'Chatbot Rules', href: '/chatbot', icon: <IconGear /> },
   { label: 'Nomor Petugas', href: '/officers', icon: <IconUsers /> },
@@ -99,15 +100,18 @@ export function Sidebar(props: SidebarProps) {
   return (
     <aside
       class={cn(
-        'flex h-full flex-col border-r border-gray-200 bg-white transition-all duration-300 dark:border-gray-700 dark:bg-gray-900',
+        'm-4 mr-0 flex h-[calc(100%-2rem)] flex-col rounded-3xl border border-white/70 bg-slate-950 text-white shadow-[0_24px_80px_-40px_rgba(2,6,23,0.95)] transition-all duration-300 dark:border-white/10 dark:bg-slate-950/80',
         props.collapsed ? 'w-16' : 'w-64',
       )}
     >
-      <div class={cn('flex h-16 items-center border-b border-gray-200 dark:border-gray-700', props.collapsed ? 'justify-center px-2' : 'px-4')}>
+      <div class={cn('flex h-20 items-center border-b border-white/10', props.collapsed ? 'justify-center px-2' : 'px-5')}>
         {props.collapsed ? (
-          <span class="text-xl font-bold text-green-600 dark:text-green-400">W</span>
+          <span class="rounded-2xl bg-emerald-500 px-3 py-2 text-xl font-bold text-white">W</span>
         ) : (
-          <span class="text-xl font-bold text-green-600 dark:text-green-400">WA Gate</span>
+          <div>
+            <span class="text-xl font-bold tracking-tight text-white">WA Gate</span>
+            <p class="text-xs text-emerald-300">BPS Buton Selatan</p>
+          </div>
         )}
       </div>
       <nav class="flex-1 overflow-y-auto py-4">
@@ -117,20 +121,22 @@ export function Sidebar(props: SidebarProps) {
               const isActive = () => location().pathname.startsWith(item.href)
               return (
                 <li>
-                  <Link
-                    to={item.href}
+                  <a
+                    href={item.href}
+                    target={item.external ? '_blank' : undefined}
+                    rel={item.external ? 'noopener noreferrer' : undefined}
                     class={cn(
-                      'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
+                      'flex items-center gap-3 rounded-2xl px-3 py-2.5 text-sm font-medium transition-colors',
                       isActive()
-                        ? 'bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-400'
-                        : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-white',
+                        ? 'bg-emerald-400/15 text-emerald-200 ring-1 ring-emerald-400/20'
+                        : 'text-slate-300 hover:bg-white/10 hover:text-white',
                       props.collapsed && 'justify-center px-2',
                     )}
                     title={props.collapsed ? item.label : undefined}
                   >
                     {item.icon}
                     {!props.collapsed && <span>{item.label}</span>}
-                  </Link>
+                  </a>
                 </li>
               )
             }}
