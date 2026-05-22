@@ -5,7 +5,6 @@ import { readFileSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 
 const PDF_SOURCE_DIR = '/mnt/c/laragon/www/bot-wa-pst/src/data/pdf'
-const GOOGLE_DRIVE_FOLDER_ID = '1gSzRegyHcg0zFstXRGEjv8JEBESzUK7D'
 
 const PDF_FILES = [
   {

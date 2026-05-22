@@ -1,31 +1,41 @@
 import { Hono } from 'hono'
-import { eq, desc } from 'drizzle-orm'
-import { db } from '../../db'
-import { content_files_wagate } from '../../db/schema'
-import { authMiddleware  } from '../middleware/auth'
-import type {ApiContext} from '../middleware/auth';
+import { authMiddleware } from '../middleware/auth'
+import type { ApiContext } from '../middleware/auth'
 import { requirePermission } from '../middleware/permission'
-import { getGoogleDriveClient } from '../../lib/google-drive'
+import { getWagateClient } from '../../lib/supabase-rest'
+
+interface ContentFile {
+  id: string
+  name: string
+  original_filename: string
+  mime_type: string
+  file_size: number
+  google_drive_id: string
+  google_drive_url: string
+  category: string | null
+  uploaded_by: string
+  created_at: string
+  updated_at: string | null
+}
 
 const content = new Hono()
 
 content.use('*', authMiddleware)
 
-// GET /content — list content files
 content.get('/', requirePermission('content'), async (c) => {
   try {
-    const rows = await db.select().from(content_files_wagate)
-      .orderBy(desc(content_files_wagate.createdAt))
-
+    const client = getWagateClient()
+    const rows = await client.select<ContentFile>('content_files_wagate', { order: 'created_at.desc' })
     return c.json({ data: rows })
-  } catch {
-    return c.json({ error: 'Failed to fetch content files' }, 500)
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : String(error)
+    return c.json({ error: 'Failed to fetch content files', detail: msg }, 500)
   }
 })
 
-// POST /content/upload — upload file to Google Drive + save metadata
 content.post('/upload', requirePermission('content'), async (c: ApiContext) => {
   try {
+    const client = getWagateClient()
     const user = c.get('user')
     const formData = await c.req.formData()
     const file = formData.get('file')
@@ -35,25 +45,31 @@ content.post('/upload', requirePermission('content'), async (c: ApiContext) => {
       return c.json({ error: 'File is required' }, 400)
     }
 
-    const buffer = Buffer.from(await file.arrayBuffer())
-    const driveClient = getGoogleDriveClient()
+    let driveClient: { uploadFile: (name: string, mime: string, buffer: Buffer) => Promise<{ id: string; url: string }> }
+    try {
+      const { getGoogleDriveClient } = await import('../../lib/google-drive')
+      driveClient = getGoogleDriveClient()
+    } catch {
+      return c.json({ error: 'Google Drive not configured' }, 503)
+    }
 
+    const buffer = Buffer.from(await file.arrayBuffer())
     const uploadResult = await driveClient.uploadFile(
       file.name,
       file.type || 'application/octet-stream',
       buffer
     )
 
-    const [row] = await db.insert(content_files_wagate).values({
+    const [row] = await client.insert<ContentFile>('content_files_wagate', {
       name: file.name.replace(/\.[^.]+$/, ''),
-      originalFilename: file.name,
-      mimeType: file.type || 'application/octet-stream',
-      fileSize: buffer.length,
-      googleDriveId: uploadResult.id,
-      googleDriveUrl: uploadResult.url,
-      category: typeof category === 'string' ? category : undefined,
-      uploadedBy: user.id,
-    }).returning()
+      original_filename: file.name,
+      mime_type: file.type || 'application/octet-stream',
+      file_size: buffer.length,
+      google_drive_id: uploadResult.id,
+      google_drive_url: uploadResult.url,
+      category: typeof category === 'string' ? category : null,
+      uploaded_by: user.id,
+    })
 
     return c.json(row, 201)
   } catch (error) {
@@ -62,28 +78,23 @@ content.post('/upload', requirePermission('content'), async (c: ApiContext) => {
   }
 })
 
-// DELETE /content/:id — delete from Google Drive + DB
 content.delete('/:id', requirePermission('content'), async (c) => {
   try {
-    const id = c.req.param('id') as string
+    const client = getWagateClient()
+    const id = c.req.param('id')
 
-    const [file] = await db.select().from(content_files_wagate)
-      .where(eq(content_files_wagate.id, id))
-      .limit(1)
-
+    const file = await client.selectOne<ContentFile>('content_files_wagate', { filter: { id: `eq.${id}` } })
     if (!file) return c.json({ error: 'Content file not found' }, 404)
 
-    // Delete from Google Drive
-    const driveClient = getGoogleDriveClient()
     try {
-      await driveClient.deleteFile(file.googleDriveId)
+      const { getGoogleDriveClient } = await import('../../lib/google-drive')
+      const driveClient = getGoogleDriveClient()
+      await driveClient.deleteFile(file.google_drive_id)
     } catch {
-      console.error(`Failed to delete file ${file.googleDriveId} from Google Drive`)
+      console.error(`Failed to delete file ${file.google_drive_id} from Google Drive`)
     }
 
-    // Delete from DB
-    await db.delete(content_files_wagate).where(eq(content_files_wagate.id, id))
-
+    await client.delete<ContentFile>('content_files_wagate', { id: `eq.${id}` })
     return c.json({ message: 'Content file deleted' })
   } catch {
     return c.json({ error: 'Failed to delete content file' }, 500)

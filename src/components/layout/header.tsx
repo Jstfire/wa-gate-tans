@@ -1,4 +1,3 @@
-import type {JSX} from 'solid-js';
 import { useAuth } from '../../contexts/auth'
 import { useTheme } from '../../contexts/theme'
 import { cn } from '../../lib/cn'

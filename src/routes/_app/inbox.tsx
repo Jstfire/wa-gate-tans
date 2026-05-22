@@ -1,5 +1,5 @@
 import { createFileRoute } from '@tanstack/solid-router'
-import { createSignal, For, Show, onCleanup } from 'solid-js'
+import { createSignal, For, Show } from 'solid-js'
 import { createQuery, createMutation, useQueryClient } from '@tanstack/solid-query'
 import { Badge } from '../../components/ui/badge'
 import { Button } from '../../components/ui/button'
@@ -139,7 +139,7 @@ function InboxPage() {
                           <div class={`mt-1 flex items-center gap-1 text-xs ${msg.direction === 'outbound' ? 'text-green-100' : 'text-gray-400'}`}>
                             <span>{new Date(msg.createdAt).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}</span>
                             <Show when={msg.direction === 'outbound'}>
-                              <Badge variant={msg.status === 'read' ? 'success' : msg.status === 'delivered' ? 'info' : 'default'}>
+                              <Badge variant={msg.status === 'read' ? 'success' : msg.status === 'delivered' ? 'secondary' : 'default'}>
                                 {msg.status}
                               </Badge>
                             </Show>

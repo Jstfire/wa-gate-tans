@@ -1,43 +1,73 @@
 import { Hono } from 'hono'
-import { eq, desc, sql  } from 'drizzle-orm'
-import { db, dbInduk } from '../../db'
-import { roles_wagate, user_roles_wagate } from '../../db/schema'
 import { authMiddleware } from '../middleware/auth'
 import { requirePermission } from '../middleware/permission'
+import { getWagateClient, getIndukClient } from '../../lib/supabase-rest'
+
+interface AkunPengguna {
+  id: number
+  username: string
+  email: string
+  pegawai_id: string | null
+}
+
+interface RolePermissions {
+  wa_connect: boolean
+  wa_send: boolean
+  wa_blast: boolean
+  templates: boolean
+  chatbot: boolean
+  content: boolean
+  api_keys: boolean
+  users: boolean
+}
+
+interface RoleRow {
+  id: string
+  name: string
+  permissions: RolePermissions
+  created_at: string
+  updated_at: string | null
+}
+
+interface UserRoleRow {
+  id: string
+  user_id: string
+  role_id: string
+  created_at: string
+}
 
 const users = new Hono()
 
 users.use('*', authMiddleware)
 
-// GET /users — list users from dbInduk (read-only)
 users.get('/', requirePermission('users'), async (c) => {
   try {
-    const rows = await dbInduk.execute(
-      sql`SELECT id, username, email, nama, is_active FROM users ORDER BY username ASC`
-    )
+    const client = getIndukClient()
+    const rows = await client.select<AkunPengguna>('akun_pengguna', {
+      select: 'id,username,email,pegawai_id',
+      order: 'username.asc',
+    })
     return c.json({ data: rows })
-  } catch {
-    return c.json({ error: 'Failed to fetch users' }, 500)
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : String(error)
+    return c.json({ error: 'Failed to fetch users', detail: msg }, 500)
   }
 })
 
-// --- Role routes (static paths BEFORE dynamic /:id routes) ---
-
-// GET /users/roles — list all roles
 users.get('/roles', requirePermission('users'), async (c) => {
   try {
-    const rows = await db.select().from(roles_wagate)
-      .orderBy(desc(roles_wagate.createdAt))
+    const client = getWagateClient()
+    const rows = await client.select<RoleRow>('roles_wagate', { order: 'created_at.desc' })
     return c.json({ data: rows })
   } catch {
     return c.json({ error: 'Failed to fetch roles' }, 500)
   }
 })
 
-// POST /users/roles — create role
 users.post('/roles', requirePermission('users'), async (c) => {
   try {
-    const body = await c.req.json()
+    const client = getWagateClient()
+    const body = await c.req.json<Record<string, unknown>>()
 
     if (typeof body.name !== 'string' || !body.name.trim()) {
       return c.json({ error: 'Field "name" is required' }, 400)
@@ -47,19 +77,21 @@ users.post('/roles', requirePermission('users'), async (c) => {
     }
 
     const p = body.permissions as Record<string, boolean>
-    const [row] = await db.insert(roles_wagate).values({
+    const permissions: RolePermissions = {
+      wa_connect: p.wa_connect ?? false,
+      wa_send: p.wa_send ?? false,
+      wa_blast: p.wa_blast ?? false,
+      templates: p.templates ?? false,
+      chatbot: p.chatbot ?? false,
+      content: p.content ?? false,
+      api_keys: p.api_keys ?? false,
+      users: p.users ?? false,
+    }
+
+    const [row] = await client.insert<RoleRow>('roles_wagate', {
       name: body.name.trim(),
-      permissions: {
-        wa_connect: p.wa_connect ?? false,
-        wa_send: p.wa_send ?? false,
-        wa_blast: p.wa_blast ?? false,
-        templates: p.templates ?? false,
-        chatbot: p.chatbot ?? false,
-        content: p.content ?? false,
-        api_keys: p.api_keys ?? false,
-        users: p.users ?? false,
-      },
-    }).returning()
+      permissions: permissions as unknown as Record<string, string>,
+    })
 
     return c.json(row, 201)
   } catch {
@@ -67,13 +99,15 @@ users.post('/roles', requirePermission('users'), async (c) => {
   }
 })
 
-// PUT /users/roles/:id — update role
 users.put('/roles/:id', requirePermission('users'), async (c) => {
   try {
-    const id = c.req.param('id') as string
-    const body = await c.req.json()
+    const client = getWagateClient()
+    const id = c.req.param('id')
+    const body = await c.req.json<Record<string, unknown>>()
 
-    const updateData: Record<string, unknown> = { updatedAt: new Date() }
+    const updateData: Record<string, string | boolean | Record<string, boolean>> = {
+      updated_at: new Date().toISOString(),
+    }
 
     if (typeof body.name === 'string' && body.name.trim()) {
       updateData.name = body.name.trim()
@@ -92,11 +126,7 @@ users.put('/roles/:id', requirePermission('users'), async (c) => {
       }
     }
 
-    const [row] = await db.update(roles_wagate)
-      .set(updateData)
-      .where(eq(roles_wagate.id, id))
-      .returning()
-
+    const [row] = await client.update<RoleRow>('roles_wagate', updateData, { id: `eq.${id}` })
     if (!row) return c.json({ error: 'Role not found' }, 404)
     return c.json(row)
   } catch {
@@ -104,14 +134,11 @@ users.put('/roles/:id', requirePermission('users'), async (c) => {
   }
 })
 
-// DELETE /users/roles/:id — delete role
 users.delete('/roles/:id', requirePermission('users'), async (c) => {
   try {
-    const id = c.req.param('id') as string
-    const [row] = await db.delete(roles_wagate)
-      .where(eq(roles_wagate.id, id))
-      .returning()
-
+    const client = getWagateClient()
+    const id = c.req.param('id')
+    const [row] = await client.delete<RoleRow>('roles_wagate', { id: `eq.${id}` })
     if (!row) return c.json({ error: 'Role not found' }, 404)
     return c.json({ message: 'Role deleted' })
   } catch {
@@ -119,49 +146,59 @@ users.delete('/roles/:id', requirePermission('users'), async (c) => {
   }
 })
 
-// --- User-role assignment routes (dynamic /:id paths) ---
-
-// GET /users/:id/roles — get roles for a user
-users.get('/:id/roles', requirePermission('users'), async (c) => {
+users.get('/:userId/roles', requirePermission('users'), async (c) => {
   try {
-    const userId = c.req.param('id') as string
-    const rows = await db
-      .select({
-        id: user_roles_wagate.id,
-        roleId: user_roles_wagate.roleId,
-        roleName: roles_wagate.name,
-        permissions: roles_wagate.permissions,
-        assignedAt: user_roles_wagate.createdAt,
-      })
-      .from(user_roles_wagate)
-      .innerJoin(roles_wagate, eq(user_roles_wagate.roleId, roles_wagate.id))
-      .where(eq(user_roles_wagate.userId, userId))
+    const client = getWagateClient()
+    const userId = c.req.param('userId')
 
-    return c.json({ data: rows })
+    const userRoles = await client.select<UserRoleRow>('user_roles_wagate', {
+      filter: { user_id: `eq.${userId}` },
+    })
+
+    if (userRoles.length === 0) return c.json({ data: [] })
+
+    const roleIds = userRoles.map((ur) => ur.role_id)
+    const roles = await client.select<RoleRow>('roles_wagate', {
+      filter: { id: `in.(${roleIds.join(',')})` },
+    })
+
+    const roleMap = new Map(roles.map((r) => [r.id, r]))
+
+    const data = userRoles.map((ur) => {
+      const role = roleMap.get(ur.role_id)
+      return {
+        id: ur.id,
+        role_id: ur.role_id,
+        role_name: role?.name ?? null,
+        permissions: role?.permissions ?? null,
+        assigned_at: ur.created_at,
+      }
+    })
+
+    return c.json({ data })
   } catch {
     return c.json({ error: 'Failed to fetch user roles' }, 500)
   }
 })
 
-// POST /users/:id/roles — assign role to user
-users.post('/:id/roles', requirePermission('users'), async (c) => {
+users.post('/:userId/roles', requirePermission('users'), async (c) => {
   try {
-    const userId = c.req.param('id') as string
-    const body = await c.req.json()
+    const client = getWagateClient()
+    const userId = c.req.param('userId') ?? ''
+    const body = await c.req.json<Record<string, unknown>>()
 
     if (typeof body.roleId !== 'string' || !body.roleId.trim()) {
       return c.json({ error: 'Field "roleId" is required' }, 400)
     }
 
-    const [role] = await db.select().from(roles_wagate)
-      .where(eq(roles_wagate.id, body.roleId)).limit(1)
-
+    const roleId = String(body.roleId)
+    const role = await client.selectOne<RoleRow>('roles_wagate', { filter: { id: `eq.${roleId}` } })
     if (!role) return c.json({ error: 'Role not found' }, 404)
 
-    const [row] = await db.insert(user_roles_wagate).values({
-      userId,
-      roleId: body.roleId,
-    }).returning()
+    const [row] = await client.insert<UserRoleRow>('user_roles_wagate', {
+      user_id: userId,
+      role_id: roleId,
+    })
 
     return c.json(row, 201)
   } catch {
@@ -169,17 +206,16 @@ users.post('/:id/roles', requirePermission('users'), async (c) => {
   }
 })
 
-// DELETE /users/:id/roles/:roleId — remove role from user
-users.delete('/:id/roles/:roleId', requirePermission('users'), async (c) => {
+users.delete('/:userId/roles/:roleId', requirePermission('users'), async (c) => {
   try {
-    const userId = c.req.param('id') as string
-    const roleId = c.req.param('roleId') as string
+    const client = getWagateClient()
+    const userId = c.req.param('userId')
+    const roleId = c.req.param('roleId')
 
-    const [row] = await db.delete(user_roles_wagate)
-      .where(
-        sql`${user_roles_wagate.userId} = ${userId} AND ${user_roles_wagate.roleId} = ${roleId}`
-      )
-      .returning()
+    const [row] = await client.delete<UserRoleRow>('user_roles_wagate', {
+      user_id: `eq.${userId}`,
+      role_id: `eq.${roleId}`,
+    })
 
     if (!row) return c.json({ error: 'User role assignment not found' }, 404)
     return c.json({ message: 'Role removed from user' })

@@ -3,7 +3,6 @@ import { createSignal, Show } from 'solid-js'
 import { Card, CardContent, CardHeader } from '../../components/ui/card'
 import { Button } from '../../components/ui/button'
 import { Badge } from '../../components/ui/badge'
-import { authHeader } from '../../contexts/auth'
 
 export const Route = createFileRoute('/_app/settings')({
   component: SettingsPage,

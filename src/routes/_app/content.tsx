@@ -2,6 +2,7 @@ import { createFileRoute } from '@tanstack/solid-router'
 import { createQuery, createMutation, useQueryClient } from '@tanstack/solid-query'
 import { createSignal } from 'solid-js'
 import { createColumnHelper } from '@tanstack/solid-table'
+import type { ColumnDef } from '@tanstack/solid-table'
 import { DataTable } from '../../components/data-table'
 import { Button } from '../../components/ui/button'
 import { Input } from '../../components/ui/input'
@@ -107,7 +108,7 @@ function ContentPage() {
       </div>
       <Card>
         <CardContent class="pt-6">
-          <DataTable data={query.data ?? []} columns={columns} loading={query.isLoading} globalFilter={search()} onGlobalFilterChange={setSearch} />
+          <DataTable data={query.data ?? []} columns={columns as ColumnDef<ContentItem, unknown>[]} loading={query.isLoading} globalFilter={search()} onGlobalFilterChange={setSearch} />
         </CardContent>
       </Card>
 

@@ -7,12 +7,6 @@ import { contacts_wagate, content_files_wagate } from '../db/schema/messages'
 import { normalizePhoneNumber } from '../lib/phone'
 import type { WaClientManager } from './wa-client'
 
-type RuleMetadata = {
-  pdf_id?: string
-  location_coords?: { lat: number; lng: number }
-  link_url?: string
-}
-
 type RawSendClient = {
   sendMessage: (to: string, content: string | Location | MessageMedia) => Promise<unknown>
 }

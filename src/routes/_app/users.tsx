@@ -104,7 +104,7 @@ function UsersPage() {
     {
       accessorKey: 'is_active',
       header: 'Status',
-      cell: (info) => <Badge variant={info.getValue() ? 'success' : 'danger'}>{info.getValue() ? 'Aktif' : 'Nonaktif'}</Badge>,
+      cell: (info) => <Badge variant={info.getValue() ? 'success' : 'destructive'}>{info.getValue() ? 'Aktif' : 'Nonaktif'}</Badge>,
     },
   ]
 
@@ -118,7 +118,7 @@ function UsersPage() {
         const active = Object.entries(perms).filter(([, v]) => v).map(([k]) => k)
         return (
           <div class="flex flex-wrap gap-1">
-            <For each={active}>{(p) => <Badge variant="info">{p}</Badge>}</For>
+            <For each={active}>{(p) => <Badge variant="secondary">{p}</Badge>}</For>
           </div>
         )
       },

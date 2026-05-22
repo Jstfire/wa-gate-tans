@@ -57,9 +57,17 @@
 - Production debug/devtools badge: ✅ removed; production bundle size reduced to 851.66 KiB / gzip 186.89 KiB.
 
 ## Current Task
-- ✅ QA 4 tampilan — DONE
-- ✅ Deploy ke Cloudflare Workers — DONE
-- ✅ Push ke GitHub — DONE (`https://github.com/Jstfire/wa-gate-tans`)
+- ✅ API production stabilized: 11/11 endpoints HTTP 200 with valid token.
+- ✅ Backend QA smoke tests completed: auth guard, templates CRUD, API keys create/revoke, officers CRUD, blast create/cancel.
+- ✅ Desktop frontend QA completed: login flow, dashboard light mode, dashboard dark mode.
+- ⚠️ Mobile screenshot evidence must be re-captured with a real 390px viewport; current browser session did not actually resize below 1280px.
+- ⏳ Final build/lint/deploy and GitHub push in progress.
+
+## 2026-05-22 Update
+- Root cause of production API failures: Cloudflare Workers I/O isolation + postgres-js TCP singleton. Fixed by Supabase REST/fetch-based DB access via `src/lib/supabase-rest.ts`.
+- Auth uses DB Induk `verify_user_password` RPC. Rapid repeated login stress can trigger DB-side invalid_password/throttling; normal login succeeds.
+- Fixed `wa_templates_wagate` table naming, removed incompatible integer-user `created_by` writes to UUID columns, fixed TanStack ColumnDef casts and badge variants.
+- Removed `hash-wasm` after Cloudflare Workers rejected runtime `WebAssembly.compile()`.
 
 ## Blockers
 - ⚠️ Google Drive OAuth invalid_grant (perlu refresh token baru)

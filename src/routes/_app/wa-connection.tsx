@@ -61,7 +61,7 @@ function WaConnectionPage() {
         <CardHeader>
           <div class="flex items-center justify-between">
             <p class="text-sm font-medium text-gray-700 dark:text-gray-300">Connection Status</p>
-            <Badge variant={status() === 'connected' ? 'success' : status() === 'connecting' ? 'warning' : 'danger'}>
+            <Badge variant={status() === 'connected' ? 'success' : status() === 'connecting' ? 'warning' : 'destructive'}>
               {status()}
             </Badge>
           </div>

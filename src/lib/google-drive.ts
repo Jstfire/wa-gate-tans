@@ -107,7 +107,11 @@ export class GoogleDriveClient {
         pageSize: 1000,
       })
 
-      return response.data.files || []
+      return (response.data.files ?? []).map((f) => ({
+        id: f.id ?? '',
+        name: f.name ?? '',
+        mimeType: f.mimeType ?? '',
+      }))
     } catch (error) {
       console.error('Google Drive list files error:', error)
       throw new Error(`Failed to list files: ${error}`)

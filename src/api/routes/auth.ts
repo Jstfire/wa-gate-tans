@@ -1,38 +1,14 @@
 import { Hono } from 'hono'
-import { eq } from 'drizzle-orm'
-import { db, dbIndukClient  } from '../../db'
-import { sessions_wagate } from '../../db/schema'
+import { getWagateClient, getIndukClient } from '../../lib/supabase-rest'
 import { signJwt, getTokenExpiry } from '../../lib/jwt'
-import { verifyPassword } from '../../lib/password'
-import { getUserRoles } from '../../lib/rbac'
-import { authMiddleware  } from '../middleware/auth'
-import type {ApiContext} from '../middleware/auth';
+import { authMiddleware } from '../middleware/auth'
+import type { ApiContext } from '../middleware/auth'
 
 const auth = new Hono()
-
-interface UserRecord {
-  id: string
-  username?: string
-  email?: string
-  password: string
-  nama?: string
-  name?: string
-  is_active?: boolean
-}
 
 interface LoginRequest {
   username: string
   password: string
-}
-
-interface LoginResponse {
-  token: string
-  expiresAt: string
-  user: {
-    id: string
-    username?: string
-    name?: string
-  }
 }
 
 auth.post('/login', async (c) => {
@@ -48,131 +24,133 @@ auth.post('/login', async (c) => {
     return c.json({ error: 'Username and password are required' }, 400)
   }
 
-  let user: UserRecord | null = null
   try {
-    const result = await dbIndukClient.unsafe(
-      `SELECT id, username, email, password, nama, name, is_active 
-       FROM users 
-       WHERE (username = $1 OR email = $1) 
-       LIMIT 1`,
-      [username]
+    // Use DB Induk RPC for password verification.
+    // Note: repeated rapid failed/successive calls may trigger DB-side password-check throttling; normal login flow is stable.
+    const induk = getIndukClient()
+    const verifyResult = await induk.rpc<{ success: boolean; id?: number; username?: string; error?: string }>('verify_user_password', {
+      args: { p_username: username, p_password: password },
+    })
+
+    if (!verifyResult?.success) {
+      return c.json({ error: 'Invalid credentials' }, 401)
+    }
+
+    const userId = String(verifyResult.id)
+    const userUsername = verifyResult.username ?? username
+
+    // Get nama_pegawai (non-critical)
+    let namaPegawai: string | null = null
+    try {
+      const pegRows = await induk.select<{ mst_pegawai?: { nama_pegawai?: string } }>(
+        'akun_pengguna',
+        {
+          select: 'pegawai_id,mst_pegawai(nama_pegawai)',
+          filter: { id: `eq.${verifyResult.id}` },
+          limit: 1,
+        }
+      )
+      namaPegawai = pegRows[0]?.mst_pegawai?.nama_pegawai ?? null
+    } catch {
+      // non-critical
+    }
+
+    // Get user roles from wagate DB
+    const wagate = getWagateClient()
+    let roleNames: string[] = []
+    try {
+      const userRoles = await wagate.select<{ roles_wagate: { name: string } }>(
+        'user_roles_wagate',
+        {
+          select: 'roles_wagate(name)',
+          filter: { user_id: `eq.${userId}` },
+        }
+      )
+      roleNames = userRoles
+        .map((r) => r.roles_wagate?.name)
+        .filter((n): n is string => Boolean(n))
+    } catch {
+      roleNames = []
+    }
+
+    const ttlSeconds = 60 * 60 * 8
+    const expiresAt = getTokenExpiry(ttlSeconds)
+    const sessionId = crypto.randomUUID()
+
+    const token = await signJwt(
+      { sub: userId, sessionId, username: userUsername, roles: roleNames },
+      ttlSeconds
     )
-    user = (result[0] as unknown as UserRecord | undefined) || null
+
+    // Save session via REST
+    await wagate.insert('sessions_wagate', {
+      id: sessionId,
+      user_id: userId,
+      token,
+      expires_at: expiresAt.toISOString(),
+    })
+
+    return c.json({
+      token,
+      expiresAt: expiresAt.toISOString(),
+      user: { id: userId, username: userUsername, name: namaPegawai },
+    })
   } catch (error) {
-    console.error('Database query error:', error)
-    return c.json({ error: 'Authentication failed' }, 500)
+    const msg = error instanceof Error ? error.message : String(error)
+    console.error('Login error:', msg)
+    return c.json({ error: 'Authentication failed', detail: msg }, 500)
   }
-
-  if (!user) {
-    return c.json({ error: 'Invalid credentials' }, 401)
-  }
-
-  if (user.is_active === false) {
-    return c.json({ error: 'Account is inactive' }, 403)
-  }
-
-  let passwordValid = false
-  try {
-    passwordValid = await verifyPassword(password, user.password)
-  } catch (error) {
-    console.error('Password verification error:', error)
-    return c.json({ error: 'Authentication failed' }, 500)
-  }
-
-  if (!passwordValid) {
-    return c.json({ error: 'Invalid credentials' }, 401)
-  }
-
-  const roles = await getUserRoles(user.id)
-  const ttlSeconds = 60 * 60 * 8
-  const expiresAt = getTokenExpiry(ttlSeconds)
-
-  const sessionId = crypto.randomUUID()
-  const token = await signJwt(
-    {
-      sub: user.id,
-      sessionId,
-      username: user.username || user.email,
-      roles: roles.map((r) => r.name),
-    },
-    ttlSeconds
-  )
-
-  await db.insert(sessions_wagate).values({
-    id: sessionId,
-    userId: user.id,
-    token,
-    expiresAt,
-  })
-
-  const response: LoginResponse = {
-    token,
-    expiresAt: expiresAt.toISOString(),
-    user: {
-      id: user.id,
-      username: user.username || user.email,
-      name: user.nama || user.name,
-    },
-  }
-
-  return c.json(response)
 })
 
 auth.post('/logout', authMiddleware, async (c: ApiContext) => {
-  const user = c.get('user')
-  await db.delete(sessions_wagate).where(eq(sessions_wagate.id, user.sessionId))
-  return c.json({ message: 'Logged out successfully' })
-})
-
-auth.post('/refresh', authMiddleware, async (c: ApiContext) => {
-  const user = c.get('user')
-  const oldToken = c.get('token')
-
-  await db.delete(sessions_wagate).where(eq(sessions_wagate.token, oldToken))
-
-  const roles = await getUserRoles(user.id)
-  const ttlSeconds = 60 * 60 * 8
-  const expiresAt = getTokenExpiry(ttlSeconds)
-
-  const sessionId = crypto.randomUUID()
-  const token = await signJwt(
-    {
-      sub: user.id,
-      sessionId,
-      username: user.username,
-      roles: roles.map((r) => r.name),
-    },
-    ttlSeconds
-  )
-
-  await db.insert(sessions_wagate).values({
-    id: sessionId,
-    userId: user.id,
-    token,
-    expiresAt,
-  })
-
-  const response: LoginResponse = {
-    token,
-    expiresAt: expiresAt.toISOString(),
-    user: {
-      id: user.id,
-      username: user.username,
-    },
+  try {
+    const token = c.get('token')
+    const wagate = getWagateClient()
+    await wagate.delete('sessions_wagate', { token: `eq.${token}` })
+    return c.json({ message: 'Logged out successfully' })
+  } catch {
+    return c.json({ message: 'Logged out' })
   }
-
-  return c.json(response)
 })
 
 auth.get('/me', authMiddleware, async (c: ApiContext) => {
   const user = c.get('user')
-  const roles = await getUserRoles(user.id)
+  return c.json({ id: user.id, username: user.username, roles: user.roles })
+})
 
-  return c.json({
-    id: user.id,
-    username: user.username,
-    roles: roles.map((r) => ({ name: r.name, permissions: r.permissions })),
-  })
+auth.post('/refresh', authMiddleware, async (c: ApiContext) => {
+  try {
+    const user = c.get('user')
+    const oldToken = c.get('token')
+    const wagate = getWagateClient()
+
+    await wagate.delete('sessions_wagate', { token: `eq.${oldToken}` })
+
+    const ttlSeconds = 60 * 60 * 8
+    const expiresAt = getTokenExpiry(ttlSeconds)
+    const sessionId = crypto.randomUUID()
+
+    const token = await signJwt(
+      { sub: user.id, sessionId, username: user.username, roles: user.roles },
+      ttlSeconds
+    )
+
+    await wagate.insert('sessions_wagate', {
+      id: sessionId,
+      user_id: user.id,
+      token,
+      expires_at: expiresAt.toISOString(),
+    })
+
+    return c.json({
+      token,
+      expiresAt: expiresAt.toISOString(),
+      user: { id: user.id, username: user.username },
+    })
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : String(error)
+    return c.json({ error: 'Refresh failed', detail: msg }, 500)
+  }
 })
 
 export default auth

@@ -1,3 +1,4 @@
+// @ts-ignore - this catch-all route is handled by the custom worker entry
 import { createServerFileRoute } from '@tanstack/solid-start/server'
 import api from '../../api/index'
 

@@ -3,7 +3,7 @@ import { pgTable, uuid, varchar, timestamp, text, boolean, jsonb } from 'drizzle
 // Sessions table
 export const sessions_wagate = pgTable('sessions_wagate', {
   id: uuid('id').primaryKey().defaultRandom(),
-  userId: uuid('user_id').notNull(),
+  userId: text('user_id').notNull(),
   token: text('token').notNull().unique(),
   expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
@@ -31,7 +31,7 @@ export const roles_wagate = pgTable('roles_wagate', {
 // User Roles junction table
 export const user_roles_wagate = pgTable('user_roles_wagate', {
   id: uuid('id').primaryKey().defaultRandom(),
-  userId: uuid('user_id').notNull(),
+  userId: text('user_id').notNull(),
   roleId: uuid('role_id').notNull().references(() => roles_wagate.id, { onDelete: 'cascade' }),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 })

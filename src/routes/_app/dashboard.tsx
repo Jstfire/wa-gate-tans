@@ -56,7 +56,7 @@ function DashboardPage() {
               <p class="text-sm font-medium text-gray-500 dark:text-gray-400">
                 Messages Today
               </p>
-              <Badge variant="info">Live</Badge>
+              <Badge variant="secondary">Live</Badge>
             </div>
           </CardHeader>
           <CardContent>
@@ -102,7 +102,7 @@ function DashboardPage() {
               </p>
               <Show
                 when={waStatusQuery.data?.status === 'connected'}
-                fallback={<Badge variant="danger">Offline</Badge>}
+                fallback={<Badge variant="destructive">Offline</Badge>}
               >
                 <Badge variant="success">Online</Badge>
               </Show>

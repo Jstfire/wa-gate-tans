@@ -1,11 +1,10 @@
 import { createFileRoute } from '@tanstack/solid-router'
-import { createSignal, For, Show } from 'solid-js'
+import { createSignal, Show } from 'solid-js'
 import { createQuery, createMutation, useQueryClient } from '@tanstack/solid-query'
 import { DataTable  } from '../../components/data-table/index'
 import type {ColumnDef} from '../../components/data-table/index';
 import { Badge } from '../../components/ui/badge'
 import { Button } from '../../components/ui/button'
-import { Card, CardContent, CardHeader } from '../../components/ui/card'
 import { authHeader } from '../../contexts/auth'
 
 export const Route = createFileRoute('/_app/blast')({
@@ -24,11 +23,7 @@ type BlastJob = {
   completedAt: string | null
 }
 
-type WaTemplate = {
-  id: string
-  name: string
-  content: string
-}
+
 
 function fetchJson<T>(url: string): Promise<T> {
   return fetch(url, { headers: authHeader() }).then((r) => {
@@ -37,11 +32,11 @@ function fetchJson<T>(url: string): Promise<T> {
   })
 }
 
-function statusVariant(s: string): 'default' | 'success' | 'warning' | 'danger' | 'info' {
+function statusVariant(s: string): 'default' | 'success' | 'warning' | 'destructive' | 'secondary' {
   if (s === 'completed') return 'success'
-  if (s === 'running') return 'info'
+  if (s === 'running') return 'secondary'
   if (s === 'paused') return 'warning'
-  if (s === 'cancelled' || s === 'failed') return 'danger'
+  if (s === 'cancelled' || s === 'failed') return 'destructive'
   return 'default'
 }
 

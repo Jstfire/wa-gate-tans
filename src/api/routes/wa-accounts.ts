@@ -1,52 +1,57 @@
 import { Hono } from 'hono'
-import { eq } from 'drizzle-orm'
-import { db } from '../../db'
-import { wa_accounts_wagate } from '../../db/schema'
 import { authMiddleware } from '../middleware/auth'
 import { requirePermission } from '../middleware/permission'
+import { getWagateClient } from '../../lib/supabase-rest'
+
+interface WaAccount {
+  id: string
+  phone_number: string | null
+  name: string | null
+  status: string
+  last_connected_at: string | null
+  created_at: string
+  updated_at: string | null
+}
 
 const waAccounts = new Hono()
 
 waAccounts.use('*', authMiddleware)
 
-// GET /wa/status — get current WA account status
+waAccounts.get('/', requirePermission('wa_connect'), async (c) => {
+  try {
+    const client = getWagateClient()
+    const rows = await client.select<WaAccount>('wa_accounts_wagate', { order: 'created_at.desc' })
+    return c.json({ data: rows })
+  } catch {
+    return c.json({ error: 'Failed to fetch WA accounts' }, 500)
+  }
+})
+
 waAccounts.get('/status', requirePermission('wa_connect'), async (c) => {
   try {
-    const [account] = await db.select({
-      id: wa_accounts_wagate.id,
-      phoneNumber: wa_accounts_wagate.phoneNumber,
-      name: wa_accounts_wagate.name,
-      status: wa_accounts_wagate.status,
-      lastConnectedAt: wa_accounts_wagate.lastConnectedAt,
-      createdAt: wa_accounts_wagate.createdAt,
-      updatedAt: wa_accounts_wagate.updatedAt,
-    }).from(wa_accounts_wagate).limit(1)
-
+    const client = getWagateClient()
+    const account = await client.selectOne<WaAccount>('wa_accounts_wagate', { order: 'created_at.asc' })
     if (!account) return c.json({ error: 'No WA account configured' }, 404)
-
     return c.json(account)
   } catch {
     return c.json({ error: 'Failed to fetch WA status' }, 500)
   }
 })
 
-// POST /wa/connect — trigger WA connection
 waAccounts.post('/connect', requirePermission('wa_connect'), async (c) => {
   try {
-    const [account] = await db.select().from(wa_accounts_wagate).limit(1)
+    const client = getWagateClient()
+    const account = await client.selectOne<WaAccount>('wa_accounts_wagate', { order: 'created_at.asc' })
 
     if (!account) {
-      // Create a new account entry
-      const [created] = await db.insert(wa_accounts_wagate).values({
-        status: 'connecting',
-      }).returning()
+      const [created] = await client.insert<WaAccount>('wa_accounts_wagate', { status: 'connecting' })
       return c.json(created)
     }
 
-    const [updated] = await db.update(wa_accounts_wagate)
-      .set({ status: 'connecting', updatedAt: new Date() })
-      .where(eq(wa_accounts_wagate.id, account.id))
-      .returning()
+    const [updated] = await client.update<WaAccount>('wa_accounts_wagate', {
+      status: 'connecting',
+      updated_at: new Date().toISOString(),
+    }, { id: `eq.${account.id}` })
 
     return c.json(updated)
   } catch {
@@ -54,42 +59,20 @@ waAccounts.post('/connect', requirePermission('wa_connect'), async (c) => {
   }
 })
 
-// POST /wa/disconnect — trigger WA disconnect
 waAccounts.post('/disconnect', requirePermission('wa_connect'), async (c) => {
   try {
-    const [account] = await db.select().from(wa_accounts_wagate).limit(1)
-
+    const client = getWagateClient()
+    const account = await client.selectOne<WaAccount>('wa_accounts_wagate', { order: 'created_at.asc' })
     if (!account) return c.json({ error: 'No WA account configured' }, 404)
 
-    const [updated] = await db.update(wa_accounts_wagate)
-      .set({ status: 'disconnected', qrCode: null, updatedAt: new Date() })
-      .where(eq(wa_accounts_wagate.id, account.id))
-      .returning()
+    const [updated] = await client.update<WaAccount>('wa_accounts_wagate', {
+      status: 'disconnected',
+      updated_at: new Date().toISOString(),
+    }, { id: `eq.${account.id}` })
 
     return c.json(updated)
   } catch {
     return c.json({ error: 'Failed to disconnect WA' }, 500)
-  }
-})
-
-// GET /wa/qr — get current QR code
-waAccounts.get('/qr', requirePermission('wa_connect'), async (c) => {
-  try {
-    const [account] = await db.select({
-      id: wa_accounts_wagate.id,
-      status: wa_accounts_wagate.status,
-      qrCode: wa_accounts_wagate.qrCode,
-    }).from(wa_accounts_wagate).limit(1)
-
-    if (!account) return c.json({ error: 'No WA account configured' }, 404)
-
-    if (account.status !== 'connecting' || !account.qrCode) {
-      return c.json({ error: 'QR code not available', status: account.status }, 400)
-    }
-
-    return c.json({ qrCode: account.qrCode, status: account.status })
-  } catch {
-    return c.json({ error: 'Failed to fetch QR code' }, 500)
   }
 })
 

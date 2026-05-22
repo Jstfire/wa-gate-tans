@@ -11,7 +11,7 @@ import apiKeys from './routes/api-keys'
 import waAccounts from './routes/wa-accounts'
 import users from './routes/users'
 
-const api = new Hono()
+const api = new Hono().basePath('/api')
 
 api.use('*', cors({
   origin: '*',
@@ -27,8 +27,9 @@ api.route('/messages', messages)
 api.route('/blast', blast)
 api.route('/content', content)
 api.route('/api-keys', apiKeys)
-api.route('/wa', waAccounts)
+api.route('/wa-accounts', waAccounts)
 api.route('/users', users)
+api.route('/roles', users)
 
 api.get('/health', (c) => c.json({ status: 'ok', timestamp: new Date().toISOString() }))
 
