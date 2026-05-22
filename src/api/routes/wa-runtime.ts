@@ -85,9 +85,9 @@ async function runtimeFetch<T>(path: string, init: RequestInit = {}, env?: Runti
 waRuntime.get('/status', requirePermission('wa_connect'), async (c) => {
   try {
     const data = await runtimeFetch<RuntimeStatus>('/api/status', {}, c.env)
-    return c.json(data)
+    return c.json({ ...data, runtimeSource: 'windows-primary' })
   } catch (error) {
-    return c.json({ status: 'error', error: error instanceof Error ? error.message : 'Failed to reach WA runtime' }, 502)
+    return c.json({ status: 'error', error: error instanceof Error ? error.message : 'Failed to reach WA runtime', runtimeSource: 'windows-primary' }, 502)
   }
 })
 
