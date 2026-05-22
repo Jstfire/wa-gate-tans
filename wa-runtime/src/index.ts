@@ -22,7 +22,6 @@ type RuntimeConfig = {
 type RuntimeState = {
   status: WaStatus
   qrRaw: string | null
-  qrDataUrl: string | null
   lastError: string | null
   lastEventAt: string | null
   startedAt: string
@@ -42,7 +41,6 @@ const config = loadConfig()
 const state: RuntimeState = {
   status: 'disconnected',
   qrRaw: null,
-  qrDataUrl: null,
   lastError: null,
   lastEventAt: null,
   startedAt: new Date().toISOString(),
@@ -155,7 +153,9 @@ async function startClient(): Promise<void> {
         '--mute-audio',
         '--no-first-run',
         '--no-default-browser-check',
-        '--js-flags=--max-old-space-size=256',
+        '--js-flags=--max-old-space-size=128',
+        '--single-process',
+        '--no-zygote',
         `--disk-cache-dir=${config.cachePath}`,
       ],
     },
@@ -164,19 +164,11 @@ async function startClient(): Promise<void> {
   client.on('qr', (qr: string) => {
     state.qrRaw = qr
     touch('qr_pending')
-    QRCode.toDataURL(qr)
-      .then((dataUrl) => {
-        state.qrDataUrl = dataUrl
-      })
-      .catch((err: unknown) => {
-        state.lastError = err instanceof Error ? err.message : 'QR generation failed'
-      })
     console.log('[WA-RUNTIME] QR received')
   })
 
   client.on('ready', () => {
     state.qrRaw = null
-    state.qrDataUrl = null
     state.readyAt = new Date().toISOString()
     state.reconnectAttempts = 0
     touch('connected')
@@ -273,7 +265,7 @@ app.get('/api/status', (c) => {
   const info = getInfo()
   return c.json({
     status: state.status,
-    hasQr: Boolean(state.qrDataUrl),
+    hasQr: Boolean(state.qrRaw),
     lastError: state.lastError,
     lastEventAt: state.lastEventAt,
     readyAt: state.readyAt,
@@ -282,11 +274,24 @@ app.get('/api/status', (c) => {
   })
 })
 
-app.get('/api/qr', (c) => c.json({ status: state.status, qr: state.qrDataUrl, raw: state.qrRaw }))
+app.get('/api/qr', async (c) => {
+  if (!state.qrRaw) {
+    return c.json({ status: state.status, qr: null, raw: null })
+  }
+
+  try {
+    const qr = await QRCode.toDataURL(state.qrRaw)
+    return c.json({ status: state.status, qr, raw: state.qrRaw })
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'QR generation failed'
+    state.lastError = message
+    return c.json({ status: state.status, qr: null, raw: state.qrRaw, error: message }, 500)
+  }
+})
 
 app.post('/api/connect', async (c) => {
   await ensureClient()
-  return c.json({ status: state.status, hasQr: Boolean(state.qrDataUrl) })
+  return c.json({ status: state.status, hasQr: Boolean(state.qrRaw) })
 })
 
 app.post('/api/disconnect', async (c) => {
@@ -295,7 +300,6 @@ app.post('/api/disconnect', async (c) => {
     client = null
   }
   state.qrRaw = null
-  state.qrDataUrl = null
   touch('disconnected')
   return c.json({ status: state.status })
 })
