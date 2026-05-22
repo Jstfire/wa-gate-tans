@@ -97,7 +97,7 @@ export function Sidebar(props: SidebarProps) {
       {!props.collapsed && (
         <div class="m-3 rounded-2xl border border-emerald-200 bg-emerald-50 p-3 text-xs leading-5 text-emerald-900 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-100">
           <p class="font-semibold">Operational Console</p>
-          <p class="mt-1 text-emerald-800 dark:text-emerald-200">Monitor koneksi, pesan, dan blast dari satu tempat.</p>
+          <p class="mt-1 text-emerald-950 dark:text-emerald-100">Monitor koneksi, pesan, dan blast dari satu tempat.</p>
         </div>
       )}
     </aside>
