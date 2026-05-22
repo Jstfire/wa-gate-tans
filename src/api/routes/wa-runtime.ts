@@ -34,42 +34,47 @@ const waRuntime = new Hono()
 
 waRuntime.use('*', authMiddleware)
 
-function runtimeConfig(): { url: string; key: string } {
-  const url = process.env.WA_RUNTIME_URL?.replace(/\/+$/, '') ?? ''
+function runtimeConfig(): { urls: string[]; key: string } {
+  const primary = process.env.WA_RUNTIME_PRIMARY_URL?.replace(/\/+$/, '') || process.env.WA_RUNTIME_URL?.replace(/\/+$/, '') || ''
+  const backup = process.env.WA_RUNTIME_BACKUP_URL?.replace(/\/+$/, '') || ''
+  const urls = [primary, backup].filter((url, index, arr) => url && arr.indexOf(url) === index)
   const key = process.env.WA_RUNTIME_API_KEY ?? ''
-  if (!url || !key) {
-    throw new Error('WA runtime is not configured')
-  }
-  return { url, key }
+  if (urls.length === 0 || !key) throw new Error('WA runtime is not configured')
+  return { urls, key }
 }
 
-async function runtimeFetch<T>(path: string, init: RequestInit = {}): Promise<T> {
-  const { url, key } = runtimeConfig()
+async function runtimeFetchFrom<T>(url: string, key: string, path: string, init: RequestInit, timeoutMs: number): Promise<T> {
   const headers = new Headers(init.headers)
   headers.set('Authorization', `Bearer ${key}`)
   headers.set('Accept', 'application/json')
-
   const controller = new AbortController()
-  const timeoutMs = path === '/api/send' ? 45_000 : path === '/api/qr' ? 12_000 : 8_000
   const timeout = setTimeout(() => controller.abort(), timeoutMs)
-
   try {
     const response = await fetch(`${url}${path}`, { ...init, headers, signal: controller.signal })
     const text = await response.text()
     const data = text ? (JSON.parse(text) as T) : ({} as T)
     if (!response.ok) {
       const message = typeof data === 'object' && data && 'error' in data ? String((data as { error?: unknown }).error) : 'WA runtime request failed'
-      throw new Error(message)
+      throw new Error(`${url}: ${message}`)
     }
     return data
   } catch (error) {
-    if (error instanceof DOMException && error.name === 'AbortError') {
-      throw new Error(`WA runtime timeout after ${timeoutMs / 1000}s`)
-    }
+    if (error instanceof DOMException && error.name === 'AbortError') throw new Error(`${url}: WA runtime timeout after ${timeoutMs / 1000}s`)
     throw error
   } finally {
     clearTimeout(timeout)
   }
+}
+
+async function runtimeFetch<T>(path: string, init: RequestInit = {}): Promise<T> {
+  const { urls, key } = runtimeConfig()
+  const timeoutMs = path === '/api/send' ? 45_000 : path === '/api/qr' ? 12_000 : 8_000
+  let lastError: unknown = null
+  for (const url of urls) {
+    try { return await runtimeFetchFrom<T>(url, key, path, init, timeoutMs) }
+    catch (error) { lastError = error }
+  }
+  throw lastError instanceof Error ? lastError : new Error('WA runtime request failed')
 }
 
 waRuntime.get('/status', requirePermission('wa_connect'), async (c) => {
