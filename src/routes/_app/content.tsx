@@ -22,12 +22,28 @@ type ContentItem = {
   uploadedAt: string
 }
 
+type ContentApiRow = {
+  id: string
+  name: string
+  original_filename: string
+  mime_type: string
+  file_size: number
+  category: string | null
+  google_drive_url: string | null
+  created_at: string
+}
+
 const col = createColumnHelper<ContentItem>()
 
 function formatSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+}
+
+function formatDate(value: string): string {
+  const date = new Date(value)
+  return Number.isNaN(date.getTime()) ? '-' : date.toLocaleDateString('id-ID')
 }
 
 function ContentPage() {
@@ -43,12 +59,25 @@ function ContentPage() {
   const [uploading, setUploading] = createSignal(false)
   const [deleting, setDeleting] = createSignal(false)
 
+  const mapRow = (r: ContentApiRow): ContentItem => ({
+    id: r.id,
+    name: r.name,
+    originalFilename: r.original_filename,
+    mimeType: r.mime_type,
+    fileSize: r.file_size,
+    category: r.category,
+    driveUrl: r.google_drive_url,
+    uploadedAt: r.created_at,
+  })
+
   const fetchItems = async () => {
     setLoading(true)
     try {
       const res = await fetch('/api/content', { headers: authHeader() })
       if (!res.ok) throw new Error('Failed to fetch')
-      setItems((await res.json()) as ContentItem[])
+      const body = (await res.json()) as { data?: ContentApiRow[] } | ContentApiRow[]
+      const rows = Array.isArray(body) ? body : (body.data ?? [])
+      setItems(rows.map(mapRow))
     } catch {
       // silently fail — UI will show empty
     } finally {
@@ -106,7 +135,7 @@ function ContentPage() {
     col.accessor('mimeType', { header: 'Tipe' }),
     col.accessor('fileSize', { header: 'Ukuran', cell: (i) => formatSize(i.getValue()) }),
     col.accessor('category', { header: 'Kategori', cell: (i) => i.getValue() ?? '-' }),
-    col.accessor('uploadedAt', { header: 'Diunggah', cell: (i) => new Date(i.getValue()).toLocaleDateString('id-ID') }),
+    col.accessor('uploadedAt', { header: 'Diunggah', cell: (i) => formatDate(i.getValue()) }),
     col.display({ id: 'actions', header: 'Aksi', cell: (i) => (
       <div class="flex gap-2">
         {i.row.original.driveUrl && (

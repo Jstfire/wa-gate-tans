@@ -22,6 +22,16 @@ type Template = {
   createdAt: string
 }
 
+type TemplateApiRow = {
+  id: string
+  name: string
+  content: string
+  variables: string[] | null
+  category: string | null
+  is_active: boolean
+  created_at: string
+}
+
 type TemplateForm = {
   name: string
   content: string
@@ -32,6 +42,10 @@ type TemplateForm = {
 
 const col = createColumnHelper<Template>()
 const emptyForm = (): TemplateForm => ({ name: '', content: '', category: '', variables: '', isActive: true })
+const formatDate = (value: string): string => {
+  const date = new Date(value)
+  return Number.isNaN(date.getTime()) ? '-' : date.toLocaleDateString('id-ID')
+}
 
 function TemplatesPage() {
   const [search, setSearch] = createSignal('')
@@ -45,12 +59,23 @@ function TemplatesPage() {
   const [saving, setSaving] = createSignal(false)
   const [deleting, setDeleting] = createSignal(false)
 
+  const mapRow = (r: TemplateApiRow): Template => ({
+    id: r.id,
+    name: r.name,
+    content: r.content,
+    variables: r.variables,
+    category: r.category,
+    isActive: r.is_active,
+    createdAt: r.created_at,
+  })
+
   const refreshTemplates = async () => {
     setLoading(true)
     try {
       const res = await fetch('/api/templates', { headers: authHeader() })
       if (!res.ok) throw new Error('Failed to fetch')
-      setTemplates((await res.json()) as Template[])
+      const rows = (await res.json()) as TemplateApiRow[]
+      setTemplates(rows.map(mapRow))
     } finally {
       setLoading(false)
     }
@@ -107,7 +132,7 @@ function TemplatesPage() {
     col.accessor('category', { header: 'Kategori', cell: (i) => i.getValue() ?? '-' }),
     col.accessor('variables', { header: 'Variabel', cell: (i) => String(i.getValue()?.length ?? 0) }),
     col.accessor('isActive', { header: 'Status', cell: (i) => <Badge variant={i.getValue() ? 'success' : 'secondary'}>{i.getValue() ? 'Aktif' : 'Nonaktif'}</Badge> }),
-    col.accessor('createdAt', { header: 'Dibuat', cell: (i) => new Date(i.getValue()).toLocaleDateString('id-ID') }),
+    col.accessor('createdAt', { header: 'Dibuat', cell: (i) => formatDate(i.getValue()) }),
     col.display({ id: 'actions', header: 'Aksi', cell: (i) => (
       <div class="flex gap-2">
         <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); openEdit(i.row.original) }}>
