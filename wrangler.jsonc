@@ -6,6 +6,10 @@
     "nodejs_compat"
   ],
   "main": "@tanstack/solid-start/server-entry",
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1
+  },
   "routes": [
     {
       "pattern": "wa-gate.buseldata.com/*",

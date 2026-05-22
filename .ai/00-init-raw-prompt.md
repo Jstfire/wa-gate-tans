@@ -68,25 +68,17 @@ Tambahkan saja
 # ============================================
 
 CLOUDFLARE_ACCOUNT_ID="99ce5fef22626a0cb6328c214b8bae3f"
-CLOUDFLARE_API_TOKEN="[REDACTED]"
 
 .env untuk database akun [username, email, password, dll. role jangan ambil dari database ini, silahkan dibikin di db supabase baru] (silahkan tarik dan pahami skema databasenya dari supabase, JANGAN ADA PENAMBAHAN ATAUPUN PERUBAHAN PADA DATABASE INI!!!):
-DATABASE_URL="postgresql://postgres.swygqqvvwgaihqoxitbs:DDkzwkKwDEZQ6b5A@aws-0-ap-southeast-1.pooler.supabase.com:6543/postgres?pgbouncer=true"
-DIRECT_URL="postgresql://postgres.swygqqvvwgaihqoxitbs:DDkzwkKwDEZQ6b5A@aws-0-ap-southeast-1.pooler.supabase.com:5432/postgres"
-JWT_SECRET="CnZr9REaNTMW6GOCbo7QkrLn3tQ5lG8McrX9HoPSg63XqTjIXhy6AgJttS8qs298"
 SUPABASE_URL="https://swygqqvvwgaihqoxitbs.supabase.co"
-SUPABASE_ANON_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN3eWdxcXZ2d2dhaWhxb3hpdGJzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQ4OTcxMTUsImV4cCI6MjA3MDQ3MzExNX0.368HCo-UbNPsB0-I0U_L1gkM4CwgQNQiLAFmxHM3Zz8"
-SUPABASE_SERVICE_ROLE_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN3eWdxcXZ2d2dhaWhxb3hpdGJzIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1NDg5NzExNSwiZXhwIjoyMDcwNDczMTE1fQ.0jUjIxMzAk1kOD5zMxMuDbp1o-bbExm4tshQDX2ZE4o"
 
 .env untuk database baru untuk repo sistem ini (database ini sebenarnya sudah dipakai repo antrean-pst-tans, jadi tabel untuk repo ini pake nama tabel \*\*\*\_wagate, contoh: messages_wagate):
-DATABASE_URL="postgresql://postgres.pmfzwbbxupeeuvhqluea:%%ek0nomi0108@aws-1-ap-southeast-1.pooler.supabase.com:6543/postgres"
 Anon public = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBtZnp3YmJ4dXBlZXV2aHFsdWVhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkwNzkxOTIsImV4cCI6MjA5NDY1NTE5Mn0.ouM7SGfMnM0TEPLxYJjesoczc4A6Rd9KKLwTv0OY-xg
 service_role = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBtZnp3YmJ4dXBlZXV2aHFsdWVhIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3OTA3OTE5MiwiZXhwIjoyMDk0NjU1MTkyfQ.dgb_XKjxGkQdVWtV_yLzdAMeQIu6ubGIzK0VadY_ktY
 
 .env google drive api:
 GOOGLE_DRIVE_FOLDER_ID="1gSzRegyHcg0zFstXRGEjv8JEBESzUK7D"
 GOOGLE_OAUTH_CLIENT_ID="786258523091-0er2llq119rd4bn4c4ggn0m8k0d8s165.apps.googleusercontent.com"
-GOOGLE_OAUTH_CLIENT_SECRET="[REDACTED]"
 GOOGLE_OAUTH_REFRESH_TOKEN="[REDACTED]"
 
 SAYA MAUNYA HASIL AKHIRNYA:

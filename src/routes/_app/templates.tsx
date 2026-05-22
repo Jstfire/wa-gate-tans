@@ -1,6 +1,5 @@
 import { createFileRoute } from '@tanstack/solid-router'
-import { createQuery, createMutation, useQueryClient } from '@tanstack/solid-query'
-import { createSignal } from 'solid-js'
+import { createSignal, onMount } from 'solid-js'
 import { createColumnHelper } from '@tanstack/solid-table'
 import type { ColumnDef } from '@tanstack/solid-table'
 import { DataTable } from '../../components/data-table'
@@ -35,25 +34,33 @@ const col = createColumnHelper<Template>()
 const emptyForm = (): TemplateForm => ({ name: '', content: '', category: '', variables: '', isActive: true })
 
 function TemplatesPage() {
-  const qc = useQueryClient()
   const [search, setSearch] = createSignal('')
   const [dialogOpen, setDialogOpen] = createSignal(false)
   const [deleteId, setDeleteId] = createSignal<string | null>(null)
   const [editing, setEditing] = createSignal<Template | null>(null)
   const [form, setForm] = createSignal<TemplateForm>(emptyForm())
 
-  const query = createQuery(() => ({
-    queryKey: ['templates'],
-    enabled: typeof window !== 'undefined',
-    queryFn: async () => {
+  const [templates, setTemplates] = createSignal<Template[]>([])
+  const [loading, setLoading] = createSignal(true)
+  const [saving, setSaving] = createSignal(false)
+  const [deleting, setDeleting] = createSignal(false)
+
+  const refreshTemplates = async () => {
+    setLoading(true)
+    try {
       const res = await fetch('/api/templates', { headers: authHeader() })
       if (!res.ok) throw new Error('Failed to fetch')
-      return res.json() as Promise<Template[]>
-    },
-  }))
+      setTemplates((await res.json()) as Template[])
+    } finally {
+      setLoading(false)
+    }
+  }
 
-  const saveMutation = createMutation(() => ({
-    mutationFn: async (data: TemplateForm) => {
+  onMount(() => { void refreshTemplates() })
+
+  const saveTemplate = async (data: TemplateForm) => {
+    setSaving(true)
+    try {
       const body = {
         name: data.name,
         content: data.content,
@@ -68,18 +75,24 @@ function TemplatesPage() {
         body: JSON.stringify(body),
       })
       if (!res.ok) throw new Error('Failed to save')
-      return res.json()
-    },
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['templates'] }); closeDialog() },
-  }))
+      closeDialog()
+      await refreshTemplates()
+    } finally {
+      setSaving(false)
+    }
+  }
 
-  const deleteMutation = createMutation(() => ({
-    mutationFn: async (id: string) => {
+  const deleteTemplate = async (id: string) => {
+    setDeleting(true)
+    try {
       const res = await fetch(`/api/templates/${id}`, { method: 'DELETE', headers: authHeader() })
       if (!res.ok) throw new Error('Failed to delete')
-    },
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['templates'] }); setDeleteId(null) },
-  }))
+      setDeleteId(null)
+      await refreshTemplates()
+    } finally {
+      setDeleting(false)
+    }
+  }
 
   const openCreate = () => { setEditing(null); setForm(emptyForm()); setDialogOpen(true) }
   const openEdit = (t: Template) => {
@@ -115,7 +128,7 @@ function TemplatesPage() {
       </div>
       <Card>
         <CardContent class="pt-6">
-          <DataTable data={query.data ?? []} columns={columns as ColumnDef<Template, unknown>[]} loading={query.isLoading} globalFilter={search()} onGlobalFilterChange={setSearch} />
+          <DataTable data={templates()} columns={columns as ColumnDef<Template, unknown>[]} loading={loading()} globalFilter={search()} onGlobalFilterChange={setSearch} />
         </CardContent>
       </Card>
 
@@ -124,7 +137,7 @@ function TemplatesPage() {
           <DialogHeader>
             <DialogTitle>{editing() ? 'Edit Template' : 'Tambah Template'}</DialogTitle>
           </DialogHeader>
-          <form onSubmit={(e) => { e.preventDefault(); saveMutation.mutate(form()) }} class="space-y-4">
+          <form onSubmit={(e) => { e.preventDefault(); void saveTemplate(form()) }} class="space-y-4">
             <Input label="Nama *" value={form().name} onInput={(e) => setForm({ ...form(), name: e.currentTarget.value })} required />
             <div class="flex flex-col gap-1">
               <label class="text-sm font-medium text-slate-700 dark:text-slate-300">Konten *</label>
@@ -138,7 +151,7 @@ function TemplatesPage() {
             </label>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={closeDialog}>Batal</Button>
-              <Button type="submit" disabled={saveMutation.isPending}>{saveMutation.isPending ? 'Menyimpan...' : 'Simpan'}</Button>
+              <Button type="submit" disabled={saving()}>{saving() ? 'Menyimpan...' : 'Simpan'}</Button>
             </DialogFooter>
           </form>
         </DialogContent>
@@ -150,8 +163,8 @@ function TemplatesPage() {
           <p class="text-sm text-slate-600 dark:text-slate-400">Yakin ingin menghapus template ini? Tindakan ini tidak dapat dibatalkan.</p>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDeleteId(null)}>Batal</Button>
-            <Button variant="destructive" disabled={deleteMutation.isPending} onClick={() => { const id = deleteId(); if (id) deleteMutation.mutate(id) }}>
-              {deleteMutation.isPending ? 'Menghapus...' : 'Hapus'}
+            <Button variant="destructive" disabled={deleting()} onClick={() => { const id = deleteId(); if (id) void deleteTemplate(id) }}>
+              {deleting() ? 'Menghapus...' : 'Hapus'}
             </Button>
           </DialogFooter>
         </DialogContent>

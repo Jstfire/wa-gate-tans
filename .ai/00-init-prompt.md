@@ -41,7 +41,6 @@ Buat file `.env` di root repo dengan isi berikut:
 # ============================================
 
 CLOUDFLARE_ACCOUNT_ID="99ce5fef22626a0cb6328c214b8bae3f"
-CLOUDFLARE_API_TOKEN="[REDACTED]"
 
 # ============================================
 
@@ -49,12 +48,7 @@ CLOUDFLARE_API_TOKEN="[REDACTED]"
 
 # ============================================
 
-DATABASE_INDUK_URL="postgresql://postgres.swygqqvvwgaihqoxitbs:DDkzwkKwDEZQ6b5A@aws-0-ap-southeast-1.pooler.supabase.com:6543/postgres?pgbouncer=true"
-DATABASE_INDUK_DIRECT_URL="postgresql://postgres.swygqqvvwgaihqoxitbs:DDkzwkKwDEZQ6b5A@aws-0-ap-southeast-1.pooler.supabase.com:5432/postgres"
-JWT_SECRET="CnZr9REaNTMW6GOCbo7QkrLn3tQ5lG8McrX9HoPSg63XqTjIXhy6AgJttS8qs298"
 SUPABASE_INDUK_URL="https://swygqqvvwgaihqoxitbs.supabase.co"
-SUPABASE_INDUK_ANON_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN3eWdxcXZ2d2dhaWhxb3hpdGJzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQ4OTcxMTUsImV4cCI6MjA3MDQ3MzExNX0.368HCo-UbNPsB0-I0U_L1gkM4CwgQNQiLAFmxHM3Zz8"
-SUPABASE_INDUK_SERVICE_ROLE_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN3eWdxcXZ2d2dhaWhxb3hpdGJzIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1NDg5NzExNSwiZXhwIjoyMDcwNDczMTE1fQ.0jUjIxMzAk1kOD5zMxMuDbp1o-bbExm4tshQDX2ZE4o"
 
 # ============================================
 
@@ -62,10 +56,7 @@ SUPABASE_INDUK_SERVICE_ROLE_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOi
 
 # ============================================
 
-DATABASE_URL="postgresql://postgres.pmfzwbbxupeeuvhqluea:%%ek0nomi0108@aws-1-ap-southeast-1.pooler.supabase.com:6543/postgres"
 SUPABASE_URL="https://pmfzwbbxupeeuvhqluea.supabase.co"
-SUPABASE_ANON_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBtZnp3YmJ4dXBlZXV2aHFsdWVhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkwNzkxOTIsImV4cCI6MjA5NDY1NTE5Mn0.ouM7SGfMnM0TEPLxYJjesoczc4A6Rd9KKLwTv0OY-xg"
-SUPABASE_SERVICE_ROLE_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBtZnp3YmJ4dXBlZXV2aHFsdWVhIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3OTA3OTE5MiwiZXhwIjoyMDk0NjU1MTkyfQ.dgb_XKjxGkQdVWtV_yLzdAMeQIu6ubGIzK0VadY_ktY"
 
 # ============================================
 
@@ -75,7 +66,6 @@ SUPABASE_SERVICE_ROLE_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 
 GOOGLE_DRIVE_FOLDER_ID="1gSzRegyHcg0zFstXRGEjv8JEBESzUK7D"
 GOOGLE_OAUTH_CLIENT_ID="[REDACTED]"
-GOOGLE_OAUTH_CLIENT_SECRET="[REDACTED]"
 GOOGLE_OAUTH_REFRESH_TOKEN="[REDACTED]"
 
 Catatan penting soal database:

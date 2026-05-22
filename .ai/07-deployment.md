@@ -67,6 +67,21 @@ curl https://wa-gate.buseldata.com/api/health
 # Expected: {"status":"ok"}
 ```
 
+## Northflank WA Runtime
+
+- Decision: `whatsapp-web.js` runs as a separate long-lived container service on Northflank, not inside Cloudflare Workers.
+- Reason: WA runtime needs Chromium/Puppeteer, persistent filesystem session (`.wwebjs_auth`), and long-lived process; Cloudflare Workers is stateless and unsuitable for this part.
+- Added service folder: `wa-runtime/`
+  - `Dockerfile`: Bun slim + Debian Chromium + required browser libraries.
+  - `src/index.ts`: Hono HTTP runtime with `whatsapp-web.js`, LocalAuth, QR generation, connect/disconnect/status/send endpoints.
+  - `README.md`: Northflank setup, env, volume mount, endpoint docs.
+  - `.env.example`: required runtime env.
+- Required Northflank volume mount: `/data` for `/data/wwebjs_auth` and `/data/wwebjs_cache`.
+- Required env: `PORT=8787`, `WA_RUNTIME_API_KEY`, `WA_GATE_ORIGIN`, `WA_RUNTIME_AUTO_START=true`, `WWEBJS_AUTH_PATH=/data/wwebjs_auth`, `WWEBJS_CACHE_PATH=/data/wwebjs_cache`, `PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium`.
+- Runtime endpoint auth: `Authorization: Bearer <WA_RUNTIME_API_KEY>` for `/api/*`; `/health` is public.
+- Anti-ban: `/api/send` implements human-like typing (`sendStateTyping`, duration based on message length, `clearState` in `finally`, micro-delay 1-3s). Blast queue still must enforce 60-90s delay between recipients before calling runtime send.
+- Validation: `cd wa-runtime && bun install && bun run typecheck` passes.
+
 ## Post-deployment Verification
 
 ### API Endpoints
