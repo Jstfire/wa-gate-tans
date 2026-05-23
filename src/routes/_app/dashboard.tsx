@@ -36,16 +36,20 @@ function DashboardPage() {
 
   onMount(async () => {
     try {
-      const [messages, templates, wa, blast] = await Promise.all([
+      const [messagesRes, templatesRes, waRes, blastRes] = await Promise.allSettled([
         fetchJson('/api/messages?today=true'),
         fetchJson('/api/templates'),
         fetchJson('/api/wa/status'),
         fetchJson('/api/blast?status=active'),
       ])
+      const messages = messagesRes.status === 'fulfilled' ? messagesRes.value : {}
+      const templates = templatesRes.status === 'fulfilled' ? templatesRes.value : {}
+      const wa = waRes.status === 'fulfilled' ? waRes.value : { status: 'disconnected' }
+      const blast = blastRes.status === 'fulfilled' ? blastRes.value : {}
       setStats({
         messagesToday: countFromPayload(messages),
         templates: countFromPayload(templates),
-        waStatus: typeof wa.status === 'string' ? wa.status : 'unknown',
+        waStatus: typeof wa.status === 'string' ? wa.status : 'disconnected',
         activeBlast: countFromPayload(blast),
       })
     } finally {
