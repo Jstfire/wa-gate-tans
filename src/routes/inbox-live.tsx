@@ -86,7 +86,17 @@ function InboxLivePage() {
 
   return (
     <div class={lightMode() ? 'wagate-light h-screen overflow-hidden bg-[#f0f2f5] text-[#111b21]' : 'h-screen overflow-hidden bg-[#111b21] text-[#e9edef]'}>
-      <style>{`.wagate-light .bg-\\[\\#0b141a\\], .wagate-light .bg-\\[\\#111b21\\], .wagate-light .bg-\\[\\#202c33\\] { background-color: #ffffff !important; } .wagate-light main.bg-\\[\\#0b141a\\], .wagate-light .relative.flex-1 { background-color: #efeae2 !important; } .wagate-light .bg-\\[\\#2a3942\\] { background-color: #f0f2f5 !important; } .wagate-light .text-\\[\\#e9edef\\], .wagate-light p { color: #111b21 !important; } .wagate-light .text-\\[\\#8696a0\\], .wagate-light .text-\\[\\#aebac1\\], .wagate-light span { color: #667781 !important; } .wagate-light .border-\\[\\#313d45\\], .wagate-light .border-\\[\\#222e35\\] { border-color: #e9edef !important; } .wagate-light .bg-\\[\\#005c4b\\] { background-color: #d9fdd3 !important; color: #111b21 !important; } .wagate-light .shadow-2xl, .wagate-light .shadow { box-shadow: none !important; }`}</style>
+      <style>{`
+        .wagate-light [class*="bg-[#0b141a]"], .wagate-light [class*="bg-[#111b21]"], .wagate-light [class*="bg-[#202c33]"] { background-color: #ffffff !important; }
+        .wagate-light [class*="bg-[#222e35]"], .wagate-light main[class*="bg-[#0b141a]"], .wagate-light .relative.flex-1 { background-color: #efeae2 !important; }
+        .wagate-light [class*="bg-[#2a3942]"] { background-color: #f0f2f5 !important; }
+        .wagate-light [class*="text-[#e9edef]"], .wagate-light p { color: #111b21 !important; }
+        .wagate-light [class*="text-[#8696a0]"], .wagate-light [class*="text-[#aebac1]"], .wagate-light span { color: #667781 !important; }
+        .wagate-light [class*="border-[#313d45]"], .wagate-light [class*="border-[#222e35]"] { border-color: #e9edef !important; }
+        .wagate-light [class*="bg-[#005c4b]"] { background-color: #d9fdd3 !important; color: #111b21 !important; }
+        .wagate-light .shadow-2xl, .wagate-light .shadow { box-shadow: none !important; }
+        .wagate-light .absolute.inset-0 { background: linear-gradient(180deg,#00a884 0 15%,#f0f2f5 15% 100%) !important; }
+      `}</style>
       <div class="absolute inset-0 bg-[linear-gradient(180deg,#00a884_0_15%,#111b21_15%_100%)]" />
       <div class="relative mx-auto flex h-screen max-w-[1600px] overflow-hidden bg-[#0b141a] shadow-2xl md:h-[calc(100vh-32px)] md:translate-y-4 md:rounded-sm">
         <aside class={`${selectedContact() ? 'hidden md:flex' : 'flex'} w-full max-w-[420px] flex-col border-r border-[#313d45] bg-[#111b21] md:flex md:w-[38%] lg:w-[32%]`}>
