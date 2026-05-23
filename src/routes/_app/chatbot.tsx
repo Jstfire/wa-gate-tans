@@ -21,6 +21,7 @@ type Rule = {
   order: number
   isActive: boolean
 }
+type RuleApiRow = { id: string; trigger: string; parent_trigger: string | null; response_type: string; response_content: string; order: number; is_active: boolean }
 
 type RuleForm = {
   trigger: string
@@ -53,7 +54,9 @@ function ChatbotPage() {
     try {
       const res = await fetch('/api/chatbot/rules', { headers: authHeader() })
       if (!res.ok) throw new Error('Failed to fetch')
-      setRules((await res.json()) as Rule[])
+      const json = await res.json()
+      const rows: RuleApiRow[] = Array.isArray(json) ? json : (json.data ?? [])
+      setRules(rows.map(r => ({ id: r.id, trigger: r.trigger, parentTrigger: r.parent_trigger, responseType: r.response_type, responseContent: r.response_content, order: r.order, isActive: r.is_active })))
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch')
     } finally {

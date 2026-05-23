@@ -12,6 +12,7 @@ import { authHeader } from '../../contexts/auth'
 
 export const Route = createFileRoute('/_app/officers')({ component: OfficersPage })
 type Officer={id:string;name:string;phoneNumber:string;position:string|null;isActive:boolean}
+type OfficerApiRow={id:string;name:string;phone_number:string;position:string|null;is_active:boolean}
 type Form={name:string;phoneNumber:string;position:string;isActive:boolean}
 const col=createColumnHelper<Officer>(); const empty=():Form=>({name:'',phoneNumber:'',position:'',isActive:true})
 function OfficersPage(){
@@ -25,7 +26,7 @@ function OfficersPage(){
   const[saving,setSaving]=createSignal(false)
   const[deleting,setDeleting]=createSignal(false)
 
-  const fetchOfficers=async()=>{const r=await fetch('/api/officers',{headers:authHeader()});if(r.ok)setData(await r.json())}
+  const fetchOfficers=async()=>{const r=await fetch('/api/officers',{headers:authHeader()});if(r.ok){const j=await r.json();const rows:OfficerApiRow[]=Array.isArray(j)?j:(j.data??[]);setData(rows.map(o=>({id:o.id,name:o.name,phoneNumber:o.phone_number,position:o.position,isActive:o.is_active})))}}
 
   onMount(async()=>{try{await fetchOfficers()}finally{setLoading(false)}})
 

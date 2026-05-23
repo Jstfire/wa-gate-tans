@@ -20,6 +20,7 @@ type ApiKeyItem = {
   isActive: boolean
   createdAt: string
 }
+type ApiKeyApiRow = { id: string; name: string; key: string; last_used_at: string | null; is_active: boolean; created_at: string }
 
 const col = createColumnHelper<ApiKeyItem>()
 
@@ -45,7 +46,8 @@ function ApiKeysPage() {
       const res = await fetch('/api/api-keys', { headers: authHeader() })
       if (!res.ok) throw new Error('Failed to fetch')
       const json = await res.json()
-      setData(json)
+      const rows: ApiKeyApiRow[] = Array.isArray(json) ? json : (json.data ?? [])
+      setData(rows.map(r => ({ id: r.id, name: r.name, key: r.key, lastUsedAt: r.last_used_at, isActive: r.is_active, createdAt: r.created_at })))
     } catch {
       // ignore
     } finally {

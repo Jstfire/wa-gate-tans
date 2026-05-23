@@ -74,8 +74,9 @@ function TemplatesPage() {
     try {
       const res = await fetch('/api/templates', { headers: authHeader() })
       if (!res.ok) throw new Error('Failed to fetch')
-      const rows = (await res.json()) as TemplateApiRow[]
-      setTemplates(rows.map(mapRow))
+      const rows = await res.json()
+      const arr: TemplateApiRow[] = Array.isArray(rows) ? rows : (rows.data ?? [])
+      setTemplates(arr.map(mapRow))
     } finally {
       setLoading(false)
     }

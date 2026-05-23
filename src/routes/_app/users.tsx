@@ -26,9 +26,10 @@ type Role = {
 }
 
 function fetchJson<T>(url: string): Promise<T> {
-  return fetch(url, { headers: authHeader() }).then((r) => {
+  return fetch(url, { headers: authHeader() }).then(async (r) => {
     if (!r.ok) throw new Error('Failed')
-    return r.json() as Promise<T>
+    const j = await r.json()
+    return (Array.isArray(j) ? j : (j.data ?? j)) as T
   })
 }
 
