@@ -1,54 +1,37 @@
 # WA Gate - Progress Tracker
 
-## Status: WA Account Persistence Fixed + Verified
+## Status: Inbox Live Now Working — Bot Reply Pending Runtime Restart
 
-## Current Situation (2026-05-23 ~08:32 UTC+8)
+## Current (2026-05-23 ~08:55 UTC+8)
 
-### Critical Fix: `wa_accounts_wagate` stayed empty after WA linked
+### Latest fixes
+1. **Messages API — inbox endpoints fixed:**
+   - `/api/messages/contacts` now returns camelCase `Contact[]` directly (no `{data}` wrapper).
+   - `/api/messages/conversation/:phone` endpoint added — returns mapped `JsMessage[]` with camelCase fields.
+   - `/api/messages/send` casts `c.env as RuntimeEnv` for sendViaRuntime.
+   - Messages mapped with `mapMessage()` from snake_case DB rows to camelCase UI types.
 
-**Observed:**
-- Primary Windows runtime already linked and authenticated.
-- `/api/wa/status` returned account:
-  - `wid`: `6285124422205`
-  - `pushname`: `Badan Pusat Statistik Kabupaten Buton Selatan`
-- But `/api/wa-accounts` returned `data: []`.
+2. **Runtime `toChatId` LID fix:**
+   - `wa-gate-runtime/src/index.ts`: `toChatId()` now preserves `@lid` suffix.
+   - Pushed to `https://github.com/Jstfire/wa-gate-runtime` commit `da38117`.
+   - **Windows runtime needs restart** to pick up this fix.
 
-**Root causes found:**
-1. Runtime webhook auth used `process.env.WA_RUNTIME_API_KEY` only.
-   - On Cloudflare Workers secrets are on `c.env`, not `process.env`.
-   - This caused runtime `/api/runtime/session` backup to be unauthorized.
-2. Session backup can be unreliable on Windows tar/session path flow.
-3. App did not persist account metadata when runtime status clearly already exposed account info.
-4. First status-upsert patch included nonexistent DB column `runtime_source`; removed it.
-5. First upsert used `void upsert...`; made it `await` so persistence completes before returning status.
+### Verified production
+- Inbox live shows contacts + messages (4 contacts, messages with timestamps).
+- `/api/wa-accounts` has account: `6285124422205 - Badan Pusat Statistik Kab. Buton Selatan`.
+- `/api/chatbot` returns 23 rules.
+- All SSR routes HTTP 200.
+- Build lint deploy all pass.
 
-**Fixes applied:**
-- `runtime-webhook.ts`: `isAuthorized(header, env)` now uses `c.env.WA_RUNTIME_API_KEY`.
-- `runtime-webhook.ts`: `/session`, `/incoming` auth pass `c.env`.
-- `wa-runtime.ts`: `/api/wa/status` now persists connected/authenticated account to `wa_accounts_wagate` using runtime account info.
-- `wa-runtime.ts`: removed invalid `runtime_source` payload.
-- `wa-runtime.ts`: await the account upsert.
-
-### Verified production result
-After calling `/api/wa/status`, `/api/wa-accounts` now returns:
-- `phone_number`: `6285124422205`
-- `name`: `Badan Pusat Statistik Kabupaten Buton Selatan`
-- `status`: `authenticated`
-- `last_connected_at`: `2026-05-22T23:52:06.599+00:00`
-
-### Latest deploys/commits
-- `cb4a0ae fix: authorize runtime webhook using worker env`
-- `528a74a fix: persist connected WA account from runtime status`
-- `21d0c14 fix: remove nonexistent runtime_source column from upsert`
-- `d97d42d fix: await WA account upsert from runtime status`
-- Current Version ID: `6ea90277-2375-4483-b638-dd245d991916`
-
-### Pending next checks
-- User send WA message again and verify:
-  - inbox list fills live,
-  - inbound message appears,
-  - bot outbound reply appears,
-  - bot reply status is `sent` not `failed`.
-- Improve runtime session backup reliability on Windows if still needed.
+### Pending
+- **User must restart Windows runtime** to get LID chatId fix → bot will start replying.
+- Deduplicate `@lid` vs normal phone contacts in contacts API.
+- Filter own number from contacts list.
 - 4-view visual QA.
-- Google Drive OAuth remains blocked (`invalid_grant`).
+- Google Drive OAuth blocked.
+
+### Latest commits
+- `c79d6a1 fix: add conversation endpoint and map messages for inbox UI`
+- `2364988 docs: update progress with wa_accounts fix verification`
+- Runtime: `da38117 fix: preserve LID chat IDs when sending replies`
+- Deploy: `7478d999-ce23-4ccc-81f2-dd7357357acb`

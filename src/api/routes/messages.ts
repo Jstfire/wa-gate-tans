@@ -82,12 +82,16 @@ messages.get('/contacts', requirePermission('wa_send'), async (c) => {
     const limit = Math.min(100, Math.max(1, Number(c.req.query('limit') ?? '20')))
     const offset = (page - 1) * limit
 
-    const rows = await client.select<MessageRow>('messages_wagate', { order: 'created_at.desc' })
+    const rows = await client.select<MessageRow>('messages_wagate', { order: 'created_at.desc', limit: 200 })
     const contacts = new Map<string, ContactRow>()
+    const ownNumber = process.env.WA_NUMBER ?? ''
 
     for (const message of rows) {
-      for (const phone of [message.from_number, message.to_number]) {
-        if (phone && !contacts.has(phone)) {
+      for (const raw of [message.from_number, message.to_number]) {
+        if (!raw) continue
+        const phone = raw.replace(/@lid$/, '')
+        if (phone === ownNumber) continue
+        if (!contacts.has(phone)) {
           contacts.set(phone, { phone_number: phone, last_message: message })
         }
       }
