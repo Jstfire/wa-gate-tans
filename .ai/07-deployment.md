@@ -44,7 +44,16 @@ bunx wrangler deploy
 - Background retry process `proc_8880f83ef62e` printed `DEPLOY SUCCESS`, but it was from an older loop and later deployments superseded it.
 - Background retry process `proc_53a129eee116` later completed with exit code `-15` because it was killed after successful manual deploys; it is obsolete and does not indicate current deployment failure.
 
+### Permanent Google Drive API connection
+- Production code now supports Service Account JWT for Google Drive uploads using native fetch.
+- Preferred secret: `GOOGLE_SERVICE_ACCOUNT_JSON` containing the full service-account JSON key.
+- Keep `GOOGLE_DRIVE_FOLDER_ID` set to target folder `1gSzRegyHcg0zFstXRGEjv8JEBESzUK7D`.
+- One-time Google setup: share the target folder with the service account `client_email` as Editor.
+- Set Worker secret with: `bunx wrangler secret put GOOGLE_SERVICE_ACCOUNT_JSON`.
+- Verify with authenticated endpoint: `GET /api/content/drive/status`.
+- Old OAuth envs remain fallback only; production should not depend on expired user refresh tokens once Service Account secret is set.
+
 ### Remaining deployment work
 - Continue live QA mobile light/dark.
 - Verify actual WhatsApp scan/connect after user scans fresh QR.
-- Google Drive OAuth token remains blocked by `invalid_grant` until a new valid refresh token is supplied.
+- Set `GOOGLE_SERVICE_ACCOUNT_JSON` secret and verify `/api/content/drive/status`.

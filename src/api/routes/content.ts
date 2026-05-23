@@ -33,6 +33,18 @@ content.get('/', requirePermission('content'), async (c) => {
   }
 })
 
+content.get('/drive/status', requirePermission('content'), async (c) => {
+  try {
+    const { getGoogleDriveClient } = await import('../../lib/google-drive')
+    const driveClient = getGoogleDriveClient(c.env as Record<string, string | undefined>)
+    const result = await driveClient.verifyConnection()
+    return c.json({ ok: true, ...result })
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : String(error)
+    return c.json({ ok: false, error: 'Google Drive connection failed', detail }, 503)
+  }
+})
+
 content.post('/upload', requirePermission('content'), async (c: ApiContext) => {
   try {
     const client = getWagateClient()
@@ -48,7 +60,7 @@ content.post('/upload', requirePermission('content'), async (c: ApiContext) => {
     let driveClient: { uploadFile: (name: string, mime: string, buffer: Buffer) => Promise<{ id: string; url: string }> }
     try {
       const { getGoogleDriveClient } = await import('../../lib/google-drive')
-      driveClient = getGoogleDriveClient()
+      driveClient = getGoogleDriveClient(c.env as Record<string, string | undefined>)
     } catch {
       return c.json({ error: 'Google Drive not configured' }, 503)
     }
@@ -88,7 +100,7 @@ content.delete('/:id', requirePermission('content'), async (c) => {
 
     try {
       const { getGoogleDriveClient } = await import('../../lib/google-drive')
-      const driveClient = getGoogleDriveClient()
+      const driveClient = getGoogleDriveClient(c.env as Record<string, string | undefined>)
       await driveClient.deleteFile(file.google_drive_id)
     } catch {
       console.error(`Failed to delete file ${file.google_drive_id} from Google Drive`)

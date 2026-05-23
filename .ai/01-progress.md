@@ -5,6 +5,13 @@
 ## Current (2026-05-23 ~09:25 UTC+8)
 
 ### Latest fixes this session
+1. **Permanent Google Drive connection:**
+   - Replaced `googleapis` OAuth-only Drive client with native fetch Drive client.
+   - Added preferred Service Account JWT auth (`GOOGLE_SERVICE_ACCOUNT_JSON`) so Drive access can be permanent and not depend on expiring OAuth refresh tokens.
+   - OAuth refresh-token auth remains fallback.
+   - Added authenticated health endpoint `GET /api/content/drive/status`.
+   - Still requires one-time secret setup and sharing folder `1gSzRegyHcg0zFstXRGEjv8JEBESzUK7D` with service account email as Editor.
+
 0. **WA Blast recipient safety:**
    - API now rejects/removes recipients that do not exist in `contacts_wagate` with `has_chat_history = true`.
    - Invalid/no-history blast creation tested in production and returns `No recipients have prior chat history`.
