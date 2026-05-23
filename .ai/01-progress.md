@@ -74,6 +74,14 @@
    - Fixed `toChatId(input)` to preserve `@lid` as an already-qualified WhatsApp chat ID.
    - Verification: `cd wa-runtime && bun run lint`, then root `bun run lint` and `bun run build` all passed.
 
+### Latest autonomous continuation (2026-05-23 — content upload hardening)
+6. **Manajemen Konten backend hardened before Shared Drive final test:**
+   - `POST /api/content/upload` now honors optional UI `name` field instead of ignoring it.
+   - Added backend file validation: non-empty, max 25 MiB, allowed MIME families PDF/image/Word/Office documents.
+   - Added category/name trimming and 255-char cap.
+   - `DELETE /api/content/:id` now validates UUID before constructing REST filter.
+   - Verification: root `bun run lint` and `bun run build` passed.
+
 ### Pending
 - Google Drive upload: service-account health OK, but actual PDF upload needs target folder inside Google Shared Drive because normal My Drive folder returns `storageQuotaExceeded` for service accounts.
 - Scan QR on backup Koyeb only if backup failover needs to be fully active.

@@ -20,6 +20,20 @@ interface ContentFile {
 
 const content = new Hono()
 
+const MAX_UPLOAD_BYTES = 25 * 1024 * 1024
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+const ALLOWED_MIME_PREFIXES = ['application/pdf', 'image/', 'application/msword', 'application/vnd.openxmlformats-officedocument']
+
+function isAllowedContentMime(mime: string): boolean {
+  return ALLOWED_MIME_PREFIXES.some((prefix) => mime === prefix || mime.startsWith(prefix))
+}
+
+function cleanOptionalText(value: FormDataEntryValue | null): string | null {
+  if (typeof value !== 'string') return null
+  const trimmed = value.trim()
+  return trimmed.length > 0 ? trimmed.slice(0, 255) : null
+}
+
 content.use('*', authMiddleware)
 
 content.get('/', requirePermission('content'), async (c) => {
@@ -51,11 +65,20 @@ content.post('/upload', requirePermission('content'), async (c: ApiContext) => {
     const user = c.get('user')
     const formData = await c.req.formData()
     const file = formData.get('file')
-    const category = formData.get('category')
+    const category = cleanOptionalText(formData.get('category'))
+    const displayName = cleanOptionalText(formData.get('name'))
 
     if (!file || !(file instanceof File)) {
       return c.json({ error: 'File is required' }, 400)
     }
+
+    const mimeType = file.type || 'application/octet-stream'
+    if (!isAllowedContentMime(mimeType)) {
+      return c.json({ error: 'Unsupported file type', allowed: 'PDF, image, Word, and Office document files only' }, 400)
+    }
+
+    if (file.size <= 0) return c.json({ error: 'File is empty' }, 400)
+    if (file.size > MAX_UPLOAD_BYTES) return c.json({ error: 'File too large', maxBytes: MAX_UPLOAD_BYTES }, 413)
 
     let driveClient: { uploadFile: (name: string, mime: string, buffer: Buffer) => Promise<{ id: string; url: string }> }
     try {
@@ -68,18 +91,18 @@ content.post('/upload', requirePermission('content'), async (c: ApiContext) => {
     const buffer = Buffer.from(await file.arrayBuffer())
     const uploadResult = await driveClient.uploadFile(
       file.name,
-      file.type || 'application/octet-stream',
+      mimeType,
       buffer
     )
 
     const [row] = await client.insert<ContentFile>('content_files_wagate', {
-      name: file.name.replace(/\.[^.]+$/, ''),
+      name: displayName ?? file.name.replace(/\.[^.]+$/, ''),
       original_filename: file.name,
-      mime_type: file.type || 'application/octet-stream',
+      mime_type: mimeType,
       file_size: buffer.length,
       google_drive_id: uploadResult.id,
       google_drive_url: uploadResult.url,
-      category: typeof category === 'string' ? category : null,
+      category,
       uploaded_by: user.id,
     })
 
@@ -95,6 +118,7 @@ content.delete('/:id', requirePermission('content'), async (c) => {
   try {
     const client = getWagateClient()
     const id = c.req.param('id')
+    if (!UUID_RE.test(id)) return c.json({ error: 'Invalid content file id' }, 400)
 
     const file = await client.selectOne<ContentFile>('content_files_wagate', { filter: { id: `eq.${id}` } })
     if (!file) return c.json({ error: 'Content file not found' }, 404)

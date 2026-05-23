@@ -190,8 +190,9 @@ List files.
 Upload file to Google Drive.
 
 **Request:** multipart/form-data
-- `file`: File
-- `category`: string
+- `file`: File (required; non-empty; max 25 MiB; allowed PDF/image/Word/Office document MIME families)
+- `name`: string (optional display name; trimmed, max 255 chars)
+- `category`: string (optional; trimmed, max 255 chars)
 
 **Response:**
 ```json
