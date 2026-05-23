@@ -237,8 +237,9 @@ async function startClient(): Promise<void> {
         '--no-first-run',
         '--no-default-browser-check',
         '--js-flags=--max-old-space-size=128',
-        '--single-process',
-        '--no-zygote',
+        // Do not use --single-process here. On Windows/Chrome it can detach the
+        // WhatsApp Web main frame during startup, causing the runtime to miss
+        // inbound messages or fail before the bot webhook can reply.
         `--disk-cache-dir=${config.cachePath}`,
       ],
     },

@@ -6,3 +6,8 @@ dist/
 *.log
 .DS_Store
 Thumbs.db
+.wwebjs_auth/
+.wwebjs_cache/
+.runtime-auth/
+.runtime-cache/
+.tmp-*
