@@ -300,12 +300,12 @@ runtimeWebhook.post('/incoming', async (c) => {
   if (!text) return c.json({ ok: true, skipped: 'empty' })
   const client = getWagateClient()
   await client.insert<MessageRow>('messages_wagate', { wa_message_id: typeof body.messageId === 'string' ? body.messageId : `in_${crypto.randomUUID()}`, from_number: from, to_number: to, content: text, message_type: 'text', direction: 'inbound', status: 'received' })
-  try {
-    await handleBot(from, replyTarget, text, c.env as RuntimeEnv)
-  } catch (error) {
-    return c.json({ ok: true, botError: error instanceof Error ? error.message : String(error) })
-  }
-  return c.json({ ok: true })
+  c.executionCtx.waitUntil(
+    handleBot(from, replyTarget, text, c.env as RuntimeEnv).catch((error: unknown) => {
+      console.error('[BOT] async handler failed:', error instanceof Error ? error.message : error)
+    })
+  )
+  return c.json({ ok: true, botQueued: true })
 })
 
 export default runtimeWebhook
