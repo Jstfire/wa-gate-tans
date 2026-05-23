@@ -17,14 +17,14 @@ interface SessionMeta extends JsonObject { level: string | null; adminMode: bool
 const runtimeWebhook = new Hono()
 
 runtimeWebhook.get('/session', async (c) => {
-  if (!isAuthorized(c.req.header('Authorization'))) return c.json({ error: 'Unauthorized' }, 401)
+  if (!isAuthorized(c.req.header('Authorization'), c.env as RuntimeEnv)) return c.json({ error: 'Unauthorized' }, 401)
   const account = await getWagateClient().selectOne<WaAccountRow>('wa_accounts_wagate', { order: 'updated_at.desc' })
   const data = metadataObject(account?.session_data ?? null)
   return c.json({ archiveBase64: typeof data.archiveBase64 === 'string' ? data.archiveBase64 : null })
 })
 
 runtimeWebhook.post('/session', async (c) => {
-  if (!isAuthorized(c.req.header('Authorization'))) return c.json({ error: 'Unauthorized' }, 401)
+  if (!isAuthorized(c.req.header('Authorization'), c.env as RuntimeEnv)) return c.json({ error: 'Unauthorized' }, 401)
   const body = await c.req.json<{ archiveBase64?: unknown; phoneNumber?: unknown; name?: unknown }>()
   if (typeof body.archiveBase64 !== 'string' || body.archiveBase64.length < 100) return c.json({ error: 'Invalid session archive' }, 400)
   const client = getWagateClient()
@@ -42,7 +42,7 @@ runtimeWebhook.post('/session', async (c) => {
   return c.json({ ok: true })
 })
 
-function isAuthorized(header: string | undefined): boolean { const key = process.env.WA_RUNTIME_API_KEY ?? ''; return Boolean(key) && header === `Bearer ${key}` }
+function isAuthorized(header: string | undefined, env?: RuntimeEnv): boolean { const key = (env?.WA_RUNTIME_API_KEY ?? process.env.WA_RUNTIME_API_KEY ?? ''); return Boolean(key) && header === `Bearer ${key}` }
 function phoneFromChatId(value: string): string { return value.replace(/@c\.us$|@g\.us$|@lid$/g, '') }
 function inboundPhone(body: IncomingPayload): string {
   if (typeof body.contactNumber === 'string' && body.contactNumber.trim()) return phoneFromChatId(body.contactNumber)
@@ -129,7 +129,7 @@ async function handleBot(from: string, text: string, env?: RuntimeEnv): Promise<
 }
 
 runtimeWebhook.post('/incoming', async (c) => {
-  if (!isAuthorized(c.req.header('Authorization'))) return c.json({ error: 'Unauthorized' }, 401)
+  if (!isAuthorized(c.req.header('Authorization'), c.env as RuntimeEnv)) return c.json({ error: 'Unauthorized' }, 401)
   const body = await c.req.json<IncomingPayload>()
   if (typeof body.from !== 'string' || typeof body.body !== 'string') return c.json({ error: 'Invalid payload' }, 400)
   const from = inboundPhone(body), to = typeof body.to === 'string' ? phoneFromChatId(body.to) : (process.env.WA_NUMBER ?? 'system'), text = body.body.trim()
