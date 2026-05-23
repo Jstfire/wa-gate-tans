@@ -133,7 +133,7 @@ waRuntime.post('/qr/refresh/:kind', requirePermission('wa_connect'), async (c) =
 waRuntime.get('/status', requirePermission('wa_connect'), async (c) => {
   try {
     const data = await runtimeFetch<RuntimeStatus>('/api/status', {}, asRuntimeEnv(c.env))
-    void upsertAccountFromStatus(data, 'windows-primary')
+    await upsertAccountFromStatus(data, 'windows-primary')
     return c.json({ ...data, runtimeSource: 'windows-primary' })
   } catch (error) {
     return c.json({ status: 'error', error: error instanceof Error ? error.message : 'Failed to reach WA runtime', runtimeSource: 'windows-primary' }, 502)
