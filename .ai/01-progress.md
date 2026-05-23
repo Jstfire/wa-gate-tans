@@ -90,6 +90,14 @@
    - Fixed loading/empty `colSpan` to include the selection column.
    - Verification: `bun run lint` and `bun run build` passed.
 
+### Latest autonomous continuation (2026-05-23 — Settings page truthful persistence/status)
+8. **Settings page no longer performs pseudo-save:**
+   - Replaced fake async save delay with real browser-local persistence under `wa-gate-settings`.
+   - Added validation: hourly/day rate limits must be positive and day >= hour; blast delay minimum must be >=60s, max >= min, max <=300s.
+   - Clarified that operator settings are local UI preferences until a server-side settings endpoint/table is introduced; blast engine remains hardcoded/safe at 60–90s.
+   - Google Drive card now queries authenticated `/api/content/drive/status` live and shows mode/folder/status plus refresh button instead of stale “Perlu refresh token”.
+   - Verification: `bun run lint` and `bun run build` passed.
+
 ### Pending
 - Google Drive upload: service-account health OK, but actual PDF upload needs target folder inside Google Shared Drive because normal My Drive folder returns `storageQuotaExceeded` for service accounts.
 - Scan QR on backup Koyeb only if backup failover needs to be fully active.
