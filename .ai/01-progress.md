@@ -5,6 +5,11 @@
 ## Current (2026-05-23 ~09:25 UTC+8)
 
 ### Latest fixes this session
+0. **WA Blast recipient safety:**
+   - API now rejects/removes recipients that do not exist in `contacts_wagate` with `has_chat_history = true`.
+   - Invalid/no-history blast creation tested in production and returns `No recipients have prior chat history`.
+   - Accidental QA draft job was deleted from DB after verification.
+
 1. **Messages API — inbox endpoints:**
    - `/api/messages/contacts` returns camelCase array, filters own number from `wa_accounts_wagate`.
    - `/api/messages/conversation/:phone` endpoint added with mapped messages.

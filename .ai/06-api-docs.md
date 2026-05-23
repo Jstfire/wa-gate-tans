@@ -335,7 +335,7 @@ List blast jobs.
 - `limit`: number
 
 #### POST /blast/jobs
-Create blast job.
+Create blast job. Safety rule: recipients are deduplicated and only numbers with prior chat history (`contacts_wagate.has_chat_history = true`) are accepted. No-history recipients are rejected/omitted to enforce anti-ban policy.
 
 **Request:**
 ```json
@@ -353,13 +353,20 @@ Create blast job.
 **Response:**
 ```json
 {
-  "success": true,
-  "job": {
-    "id": "uuid",
-    "name": "Blast Campaign 1",
-    "status": "draft",
-    "total_recipients": 2
-  }
+  "id": "uuid",
+  "name": "Blast Campaign 1",
+  "status": "draft",
+  "total_recipients": 1,
+  "accepted_recipients": 1,
+  "rejected_recipients": ["6289876543210"]
+}
+```
+
+**All recipients rejected:**
+```json
+{
+  "error": "No recipients have prior chat history",
+  "rejectedRecipients": ["6289876543210"]
 }
 ```
 

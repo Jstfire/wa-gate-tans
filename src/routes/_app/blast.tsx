@@ -22,7 +22,39 @@ type BlastJob = {
   completedAt: string | null
 }
 
+type RawBlastJob = {
+  id: string
+  name: string
+  status: string
+  total_recipients?: number
+  totalRecipients?: number
+  sent_count?: number
+  sentCount?: number
+  failed_count?: number
+  failedCount?: number
+  created_at?: string
+  createdAt?: string
+  started_at?: string | null
+  startedAt?: string | null
+  completed_at?: string | null
+  completedAt?: string | null
+}
 
+type BlastListResponse = { data?: RawBlastJob[] }
+
+function mapBlastJob(row: RawBlastJob): BlastJob {
+  return {
+    id: row.id,
+    name: row.name,
+    status: row.status,
+    totalRecipients: row.totalRecipients ?? row.total_recipients ?? 0,
+    sentCount: row.sentCount ?? row.sent_count ?? 0,
+    failedCount: row.failedCount ?? row.failed_count ?? 0,
+    createdAt: row.createdAt ?? row.created_at ?? '',
+    startedAt: row.startedAt ?? row.started_at ?? null,
+    completedAt: row.completedAt ?? row.completed_at ?? null,
+  }
+}
 
 function fetchJson<T>(url: string): Promise<T> {
   return fetch(url, { headers: authHeader() }).then((r) => {
@@ -54,8 +86,9 @@ function BlastPage() {
 
   const fetchJobs = async () => {
     try {
-      const data = await fetchJson<BlastJob[]>('/api/blast')
-      setJobs(data)
+      const data = await fetchJson<BlastListResponse | RawBlastJob[]>('/api/blast')
+      const rows = Array.isArray(data) ? data : data.data ?? []
+      setJobs(rows.map(mapBlastJob))
     } catch {
       // keep existing data on error
     } finally {
@@ -216,7 +249,11 @@ function CreateBlastDialog(props: CreateBlastDialogProps) {
           recipients: parsedRecipients(),
         }),
       })
-      if (!res.ok) throw new Error('Gagal membuat blast job')
+      if (!res.ok) {
+        const payload = await res.json().catch(() => ({ error: 'Gagal membuat blast job' })) as { error?: string; rejectedRecipients?: string[] }
+        const rejected = payload.rejectedRecipients?.length ? ` (${payload.rejectedRecipients.length} nomor ditolak)` : ''
+        throw new Error(`${payload.error ?? 'Gagal membuat blast job'}${rejected}`)
+      }
       props.onSuccess()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Gagal membuat blast job')
