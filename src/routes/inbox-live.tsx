@@ -24,6 +24,13 @@ function InboxLivePage() {
   const [loadingContacts, setLoadingContacts] = createSignal(true)
   const [loadingMessages, setLoadingMessages] = createSignal(false)
   const [sending, setSending] = createSignal(false)
+  const [lightMode, setLightMode] = createSignal(false)
+
+  const applyTheme = (mode: 'light' | 'dark') => {
+    setLightMode(mode === 'light')
+    localStorage.setItem('theme', mode)
+    document.documentElement.classList.toggle('dark', mode === 'dark')
+  }
 
   const loadContacts = async () => {
     const data = await fetchJson<Contact[]>('/api/messages/contacts')
@@ -52,6 +59,7 @@ function InboxLivePage() {
   }
 
   onMount(() => {
+    applyTheme(localStorage.getItem('theme') === 'light' ? 'light' : 'dark')
     void loadContacts()
     const contactTimer = window.setInterval(() => { void loadContacts() }, 7000)
     const messageTimer = window.setInterval(() => { void loadMessages() }, 4000)
@@ -72,13 +80,14 @@ function InboxLivePage() {
   }
 
   return (
-    <div class="h-screen overflow-hidden bg-[#111b21] text-[#e9edef]">
+    <div class={lightMode() ? 'wagate-light h-screen overflow-hidden bg-[#f0f2f5] text-[#111b21]' : 'h-screen overflow-hidden bg-[#111b21] text-[#e9edef]'}>
+      <style>{`.wagate-light .bg-\\[\\#0b141a\\], .wagate-light .bg-\\[\\#111b21\\], .wagate-light .bg-\\[\\#202c33\\] { background-color: #ffffff !important; } .wagate-light main.bg-\\[\\#0b141a\\], .wagate-light .relative.flex-1 { background-color: #efeae2 !important; } .wagate-light .bg-\\[\\#2a3942\\] { background-color: #f0f2f5 !important; } .wagate-light .text-\\[\\#e9edef\\], .wagate-light p { color: #111b21 !important; } .wagate-light .text-\\[\\#8696a0\\], .wagate-light .text-\\[\\#aebac1\\], .wagate-light span { color: #667781 !important; } .wagate-light .border-\\[\\#313d45\\], .wagate-light .border-\\[\\#222e35\\] { border-color: #e9edef !important; } .wagate-light .bg-\\[\\#005c4b\\] { background-color: #d9fdd3 !important; color: #111b21 !important; } .wagate-light .shadow-2xl, .wagate-light .shadow { box-shadow: none !important; }`}</style>
       <div class="absolute inset-0 bg-[linear-gradient(180deg,#00a884_0_15%,#111b21_15%_100%)]" />
       <div class="relative mx-auto flex h-screen max-w-[1600px] overflow-hidden bg-[#0b141a] shadow-2xl md:h-[calc(100vh-32px)] md:translate-y-4 md:rounded-sm">
         <aside class="flex w-full max-w-[420px] flex-col border-r border-[#313d45] bg-[#111b21] md:w-[38%] lg:w-[32%]">
           <div class="flex h-[60px] items-center justify-between bg-[#202c33] px-4">
             <div class="flex items-center gap-3"><div class="flex h-10 w-10 items-center justify-center rounded-full bg-[#00a884] font-semibold text-[#06251d]">WA</div><div><p class="text-sm font-semibold">WA Gate Inbox</p><p class="text-xs text-[#8696a0]">Primary runtime monitor</p></div></div>
-            <a href="/dashboard" class="rounded-full p-2 text-[#aebac1] hover:bg-[#2a3942]" title="Dashboard"><svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12l9-9 9 9"/><path d="M5 10v10h14V10"/></svg></a>
+            <div class="flex items-center gap-1"><button type="button" onClick={() => applyTheme(lightMode() ? 'dark' : 'light')} class="rounded-full p-2 text-[#aebac1] hover:bg-[#2a3942]" title="Toggle tema">{lightMode() ? '🌙' : '☀️'}</button><a href="/dashboard" class="rounded-full p-2 text-[#aebac1] hover:bg-[#2a3942]" title="Dashboard"><svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12l9-9 9 9"/><path d="M5 10v10h14V10"/></svg></a></div>
           </div>
           <div class="border-b border-[#222e35] bg-[#111b21] p-2"><div class="flex items-center gap-2 rounded-lg bg-[#202c33] px-3 py-2 text-[#8696a0]"><svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input value={search()} onInput={(event) => setSearch(event.currentTarget.value)} placeholder="Cari atau mulai chat baru" class="w-full bg-transparent text-sm text-[#e9edef] outline-none placeholder:text-[#8696a0]" /></div></div>
           <div class="flex-1 overflow-y-auto"><Show when={!loadingContacts()} fallback={<ContactSkeleton />}><For each={filteredContacts()} fallback={<EmptyContacts />}>{(contact) => (<button type="button" onClick={() => chooseContact(contact.phoneNumber)} class={`flex w-full items-center gap-3 border-b border-[#222e35] px-3 py-3 text-left hover:bg-[#202c33] ${selectedContact() === contact.phoneNumber ? 'bg-[#2a3942]' : ''}`}><div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[#6a7175] text-sm font-semibold text-white">{initials(contact.name ?? contact.phoneNumber)}</div><div class="min-w-0 flex-1"><div class="flex items-center justify-between gap-3"><p class="truncate text-[15px] text-[#e9edef]">{contact.name ?? contact.phoneNumber}</p><span class="shrink-0 text-xs text-[#8696a0]">{formatTime(contact.lastMessageAt)}</span></div><p class="truncate text-sm text-[#8696a0]">{contact.phoneNumber}</p></div></button>)}</For></Show></div>
