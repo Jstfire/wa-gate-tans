@@ -157,7 +157,7 @@ waRuntime.get('/status/all', requirePermission('wa_connect'), async (c) => {
 
 type WaAccountRow = { id: string; phone_number: string | null; name: string | null; status: string; last_connected_at: string | null }
 
-async function upsertAccountFromStatus(data: RuntimeStatus, runtimeSource: string): Promise<void> {
+async function upsertAccountFromStatus(data: RuntimeStatus, _runtimeSource: string): Promise<void> {
   if (!data.account?.wid) return
   try {
     const client = getWagateClient()
@@ -165,7 +165,7 @@ async function upsertAccountFromStatus(data: RuntimeStatus, runtimeSource: strin
     const name = data.account.pushname ?? null
     const now = new Date().toISOString()
     const existing = await client.selectOne<WaAccountRow>('wa_accounts_wagate', { filter: { phone_number: `eq.${phone}` } })
-    const payload: Record<string, string | null> = { phone_number: phone, name, status: data.status, runtime_source: runtimeSource, last_connected_at: data.readyAt ?? now, updated_at: now }
+    const payload: Record<string, string | null> = { phone_number: phone, name, status: data.status, last_connected_at: data.readyAt ?? now, updated_at: now }
     if (existing) await client.update<WaAccountRow>('wa_accounts_wagate', payload, { phone_number: `eq.${phone}` })
     else await client.insert<WaAccountRow>('wa_accounts_wagate', { ...payload, created_at: now })
   } catch (error) {
