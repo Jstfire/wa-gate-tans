@@ -118,7 +118,7 @@ function normalizePhoneNumber(input: string): string {
 }
 
 function toChatId(input: string): string {
-  if (input.endsWith('@c.us') || input.endsWith('@g.us')) return input
+  if (input.endsWith('@c.us') || input.endsWith('@g.us') || input.endsWith('@lid')) return input
   return `${normalizePhoneNumber(input)}@c.us`
 }
 

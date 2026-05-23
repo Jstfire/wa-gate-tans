@@ -38,7 +38,7 @@
   - Local runtime command: `PORT=8789 bun run start`.
   - Public route: `https://wa-runtime.buseldata.com/api/status` returns connected/authenticated.
   - WA account: `6285124422205` / `Badan Pusat Statistik Kabupaten Buton Selatan`.
-- **Backup (Koyeb):** UP — reachable, status `qr_pending` (needs scan only if backup failover is required).
+- **Backup (Koyeb):** non-critical; latest QA saw timeout/unreachable after earlier `qr_pending`. Needs scan/redeploy only if backup failover is required.
   - Koyeb URL: `https://precise-melessa-ipds7415-39519134.koyeb.app`
 
 ### Latest commits
@@ -66,6 +66,13 @@
    - Recipient state transitions: `pending -> sending -> sent/failed`; job counts/status refresh after each attempt.
    - Uses existing `sendViaRuntime(..., simulateTyping=true)` so runtime human-like typing remains active.
    - Build/lint passed; deployed version `fd4dae03-b882-4b81-a99c-8fd0df76520b`; trigger deployed as `schedule: * * * * *`.
+
+### Latest autonomous continuation (2026-05-23 — runtime artifact sync)
+5. **Runtime `@lid` preservation synced into repo artifact:**
+   - Audit found production Windows runtime had already been patched/verified for `@lid`, but the in-repo `wa-runtime/src/index.ts` still only preserved `@c.us` and `@g.us`.
+   - Risk: future Docker/Koyeb/Windows redeploy from this repo could regress bot replies by converting `@lid` chat IDs to `@c.us`.
+   - Fixed `toChatId(input)` to preserve `@lid` as an already-qualified WhatsApp chat ID.
+   - Verification: `cd wa-runtime && bun run lint`, then root `bun run lint` and `bun run build` all passed.
 
 ### Pending
 - Google Drive upload: service-account health OK, but actual PDF upload needs target folder inside Google Shared Drive because normal My Drive folder returns `storageQuotaExceeded` for service accounts.
