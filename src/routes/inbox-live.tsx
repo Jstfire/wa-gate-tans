@@ -33,13 +33,18 @@ function InboxLivePage() {
   }
 
   const loadContacts = async () => {
-    const data = await fetchJson<Contact[]>('/api/messages/contacts')
-    setContacts(data)
-    if (!selectedContact() && data[0]) {
-      setSelectedContact(data[0].phoneNumber)
-      void loadMessages(true)
+    try {
+      const data = await fetchJson<Contact[]>('/api/messages/contacts')
+      setContacts(data)
+      if (!selectedContact() && data[0]) {
+        setSelectedContact(data[0].phoneNumber)
+        void loadMessages(true)
+      }
+    } catch {
+      // silently fail — keep existing contacts, skeleton will clear
+    } finally {
+      setLoadingContacts(false)
     }
-    setLoadingContacts(false)
   }
   const sameMessages = (next: Message[]): boolean => {
     const current = messages()
