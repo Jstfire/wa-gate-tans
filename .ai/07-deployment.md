@@ -5,7 +5,8 @@
 ### Current production
 - App domain: `https://wa-gate.buseldata.com`
 - Worker: `wa-gate-tans`
-- Latest deployed version ID: `95e05b05-6360-4c55-9b68-34f369929e2b`
+- Latest deployed version ID: `a2ffac9a-fbc6-4287-a8f7-f87d951058e7`
+- Previous chatbot parity + inbox-live fix: `95e05b05-6360-4c55-9b68-34f369929e2b`
 - Previous chatbot rewrite deploy: `85571f79-7f50-43f6-8d1e-af6aedb54323`
 - Previous cloudflared/startup hardening deploy: `80461a30-a8e3-49b6-9712-e906677003f4`
 - Previous runtime reconnect deploy: `fbd78a2a-1e6f-4393-a8b0-7da291229490`
