@@ -51,6 +51,7 @@ function customWorkerEntry(): Plugin {
       return `
 import { createStartHandler, defaultStreamHandler } from '@tanstack/solid-start/server'
 import api from '/src/api/index'
+import { processBlastQueue } from '/src/api/routes/blast'
 
 const startFetch = createStartHandler(defaultStreamHandler)
 
@@ -61,6 +62,11 @@ export default {
       return api.fetch(request, env, ctx)
     }
     return startFetch(request, env, ctx)
+  },
+  async scheduled(controller, env, ctx) {
+    if (controller.cron === '* * * * *') {
+      ctx.waitUntil(processBlastQueue(env))
+    }
   }
 }
 `

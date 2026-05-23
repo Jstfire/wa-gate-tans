@@ -4,6 +4,8 @@ import type { ApiContext } from '../middleware/auth'
 import { requirePermission } from '../middleware/permission'
 import { uniquePhoneNumbers } from '../../lib/phone'
 import { getWagateClient } from '../../lib/supabase-rest'
+import { sendViaRuntime } from './wa-runtime'
+import type { RuntimeEnv } from './wa-runtime'
 
 type JsonValue = string | number | boolean | null | { [key: string]: JsonValue } | JsonValue[]
 
@@ -64,7 +66,6 @@ blast.get('/', requirePermission('wa_blast'), async (c) => {
 blast.post('/', requirePermission('wa_blast'), async (c: ApiContext) => {
   try {
     const client = getWagateClient()
-    const user = c.get('user')
     const body = await c.req.json<Record<string, unknown>>()
 
     if (typeof body.name !== 'string' || !body.name.trim()) {
@@ -213,5 +214,93 @@ blast.get('/:id/recipients', requirePermission('wa_blast'), async (c) => {
     return c.json({ error: 'Failed to fetch blast recipients' }, 500)
   }
 })
+
+function nextAllowedSendAt(lastSentAt: string | null): Date {
+  const base = lastSentAt ? new Date(lastSentAt).getTime() : 0
+  const jitterSeconds = 60 + Math.floor(Math.random() * 31)
+  return new Date(base + jitterSeconds * 1000)
+}
+
+function nowIso(): string {
+  return new Date().toISOString()
+}
+
+async function refreshJobCounts(jobId: string): Promise<BlastJob | null> {
+  const client = getWagateClient()
+  const recipients = await client.select<BlastRecipient>('blast_recipients_wagate', {
+    select: 'id,status',
+    filter: { job_id: `eq.${jobId}` },
+    limit: 1000,
+  })
+  const sent = recipients.filter((recipient) => recipient.status === 'sent').length
+  const failed = recipients.filter((recipient) => recipient.status === 'failed').length
+  const pending = recipients.filter((recipient) => recipient.status === 'pending' || recipient.status === 'sending').length
+  const status = pending === 0 ? 'completed' : 'running'
+  const [updated] = await client.update<BlastJob>('blast_jobs_wagate', {
+    sent_count: sent,
+    failed_count: failed,
+    status,
+    completed_at: status === 'completed' ? nowIso() : null,
+    updated_at: nowIso(),
+  }, { id: `eq.${jobId}` })
+  return updated ?? null
+}
+
+export async function processBlastQueue(env?: RuntimeEnv): Promise<{ processed: boolean; reason?: string; jobId?: string; recipientId?: string }> {
+  const client = getWagateClient()
+  const jobs = await client.select<BlastJob>('blast_jobs_wagate', {
+    filter: { status: 'in.(queued,running)' },
+    order: 'started_at.asc.nullsfirst,created_at.asc',
+    limit: 1,
+  })
+  const job = jobs[0]
+  if (!job) return { processed: false, reason: 'no queued/running job' }
+
+  const lastSent = await client.select<BlastRecipient>('blast_recipients_wagate', {
+    select: 'id,sent_at,status,job_id,phone_number,error_message,created_at',
+    filter: { job_id: `eq.${job.id}`, status: 'eq.sent' },
+    order: 'sent_at.desc',
+    limit: 1,
+  })
+  const allowedAt = nextAllowedSendAt(lastSent[0]?.sent_at ?? job.started_at)
+  if (Date.now() < allowedAt.getTime()) {
+    await updateStatus(job.id, 'running')
+    return { processed: false, reason: `waiting until ${allowedAt.toISOString()}`, jobId: job.id }
+  }
+
+  const recipients = await client.select<BlastRecipient>('blast_recipients_wagate', {
+    filter: { job_id: `eq.${job.id}`, status: 'eq.pending' },
+    order: 'created_at.asc',
+    limit: 1,
+  })
+  const recipient = recipients[0]
+  if (!recipient) {
+    await refreshJobCounts(job.id)
+    return { processed: false, reason: 'job completed', jobId: job.id }
+  }
+
+  await updateStatus(job.id, 'running')
+  await client.update<BlastRecipient>('blast_recipients_wagate', { status: 'sending', updated_at: nowIso() }, { id: `eq.${recipient.id}` })
+
+  try {
+    const sent = await sendViaRuntime(recipient.phone_number, job.message_content, env)
+    if (!sent.success) throw new Error(sent.error ?? 'Runtime send failed')
+    await client.update<BlastRecipient>('blast_recipients_wagate', {
+      status: 'sent',
+      sent_at: nowIso(),
+      error_message: null,
+      updated_at: nowIso(),
+    }, { id: `eq.${recipient.id}` })
+  } catch (error) {
+    await client.update<BlastRecipient>('blast_recipients_wagate', {
+      status: 'failed',
+      error_message: error instanceof Error ? error.message.slice(0, 500) : 'Unknown send error',
+      updated_at: nowIso(),
+    }, { id: `eq.${recipient.id}` })
+  }
+
+  await refreshJobCounts(job.id)
+  return { processed: true, jobId: job.id, recipientId: recipient.id }
+}
 
 export default blast

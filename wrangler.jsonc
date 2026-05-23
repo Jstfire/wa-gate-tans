@@ -15,5 +15,8 @@
       "pattern": "wa-gate.buseldata.com/*",
       "zone_name": "buseldata.com"
     }
-  ]
+  ],
+  "triggers": {
+    "crons": ["* * * * *"]
+  }
 }
