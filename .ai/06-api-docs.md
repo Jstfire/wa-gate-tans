@@ -374,7 +374,7 @@ Create blast job. Safety rule: recipients are deduplicated and only numbers with
 Get blast job detail.
 
 #### POST /blast/jobs/:id/start
-Start blast job.
+Start blast job by changing status from `draft` to `queued`. Production Worker cron (`* * * * *`) processes queued/running jobs asynchronously. The dispatcher sends at most one pending recipient per cron tick and enforces a random 60–90 second guard after the previous sent recipient before sending the next one.
 
 #### POST /blast/jobs/:id/pause
 Pause blast job.

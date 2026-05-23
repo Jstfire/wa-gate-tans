@@ -53,7 +53,13 @@ bunx wrangler deploy
 - Verify with authenticated endpoint: `GET /api/content/drive/status`.
 - Old OAuth envs remain fallback only; production should not depend on expired user refresh tokens once Service Account secret is set.
 
+### Worker cron triggers
+- `wrangler.jsonc` now includes cron trigger `* * * * *`.
+- Custom Worker entry exports `scheduled(controller, env, ctx)` and calls `processBlastQueue(env)` for WA Blast dispatch.
+- Deployment verification: `bunx wrangler deploy` showed `Deployed wa-gate-tans triggers` and `schedule: * * * * *`.
+- Latest deploy for cron dispatcher: `fd4dae03-b882-4b81-a99c-8fd0df76520b`.
+
 ### Remaining deployment work
 - Continue live QA mobile light/dark.
-- Verify actual WhatsApp scan/connect after user scans fresh QR.
-- Set `GOOGLE_SERVICE_ACCOUNT_JSON` secret and verify `/api/content/drive/status`.
+- Move Google Drive content folder into Shared Drive and update `GOOGLE_DRIVE_FOLDER_ID`; service-account auth itself is already OK.
+- Scan backup Koyeb QR only if backup failover is required.

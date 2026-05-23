@@ -57,8 +57,18 @@
 - Chatbot rules: ✅ 23 rules loaded
 - All SSR routes: ✅ HTTP 200
 
+### Latest autonomous continuation (2026-05-23)
+4. **WA Blast cron dispatcher deployed:**
+   - Added Cloudflare Worker scheduled handler for cron `* * * * *`.
+   - Added `processBlastQueue(env)` in `src/api/routes/blast.ts`.
+   - Dispatcher picks one `queued/running` blast job per tick, sends at most one pending recipient, and enforces random 60–90s guard from the previous sent recipient.
+   - Pause/resume/cancel respected because only `queued/running` jobs are processed.
+   - Recipient state transitions: `pending -> sending -> sent/failed`; job counts/status refresh after each attempt.
+   - Uses existing `sendViaRuntime(..., simulateTyping=true)` so runtime human-like typing remains active.
+   - Build/lint passed; deployed version `fd4dae03-b882-4b81-a99c-8fd0df76520b`; trigger deployed as `schedule: * * * * *`.
+
 ### Pending
-- Set `GOOGLE_SERVICE_ACCOUNT_JSON` Worker secret and share Drive folder to service account as Editor.
+- Google Drive upload: service-account health OK, but actual PDF upload needs target folder inside Google Shared Drive because normal My Drive folder returns `storageQuotaExceeded` for service accounts.
 - Scan QR on backup Koyeb only if backup failover needs to be fully active.
 - 4-view visual QA: desktop dark/light passed; mobile dark passed; mobile light needs manual/clean-session recheck.
-- Continue content upload QA after permanent Google Drive credential is installed.
+- QA WA Blast dispatcher with real 2–3 allowed-history recipients only when safe; current production has no active queued/running blast job.
