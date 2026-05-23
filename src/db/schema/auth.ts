@@ -48,6 +48,18 @@ export const api_keys_wagate = pgTable('api_keys_wagate', {
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 })
 
+// Local admins table — wagate-only fallback account, does not modify DB induk
+export const local_admins_wagate = pgTable('local_admins_wagate', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  username: varchar('username', { length: 100 }).notNull().unique(),
+  passwordHash: text('password_hash').notNull(),
+  displayName: varchar('display_name', { length: 255 }),
+  role: varchar('role', { length: 50 }).default('admin').notNull(),
+  isActive: boolean('is_active').default(true).notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+})
+
 // Type exports
 export type Session = typeof sessions_wagate.$inferSelect
 export type NewSession = typeof sessions_wagate.$inferInsert
@@ -55,5 +67,7 @@ export type Role = typeof roles_wagate.$inferSelect
 export type NewRole = typeof roles_wagate.$inferInsert
 export type UserRole = typeof user_roles_wagate.$inferSelect
 export type NewUserRole = typeof user_roles_wagate.$inferInsert
+export type LocalAdmin = typeof local_admins_wagate.$inferSelect
+export type NewLocalAdmin = typeof local_admins_wagate.$inferInsert
 export type ApiKey = typeof api_keys_wagate.$inferSelect
 export type NewApiKey = typeof api_keys_wagate.$inferInsert

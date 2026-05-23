@@ -129,6 +129,17 @@
    - Note: test number `6289616370100` is also active Admin 1 in `officer_numbers_wagate`, so admin notification to that number is expected.
    - Build/lint passed; deployed versions `85571f79-7f50-43f6-8d1e-af6aedb54323` then `95e05b05-6360-4c55-9b68-34f369929e2b`.
 
+### Latest autonomous continuation (2026-05-23 — async chatbot timeout + superadmin fallback)
+11. **Runtime webhook timeout fixed:**
+   - Background test `proc_2dfed0eaacf7` showed T2/T3 timed out because `handleBot()` waited for human-like typing/sending inside the Worker request, exceeding Cloudflare request timeout.
+   - Fixed `/api/runtime/incoming` to insert inbound message, call `c.executionCtx.waitUntil(handleBot(...))`, and immediately return `{ ok: true, botQueued: true }`.
+   - Production QA after deploy `a2ffac9a-fbc6-4287-a8f7-f87d951058e7`: T1/T2/T3 all returned HTTP 200 within 10 seconds, no timeout.
+12. **Local superadmin fallback added without modifying DB induk:**
+   - Created wagate-only table `local_admins_wagate` and RPC `verify_local_admin_password()` in wagate DB only.
+   - Added `superadmin` local fallback account and linked it to existing `admin` role via `user_roles_wagate`.
+   - Auth flow still tries DB induk RPC; if it fails, local admin fallback is used.
+   - Browser QA: `superadmin` login succeeds, dashboard shows Super Admin, `/api/templates` returns HTTP 200 and 19 templates.
+
 ### Pending
 - Google Drive upload: service-account health OK, but actual PDF upload needs target folder inside Google Shared Drive because normal My Drive folder returns `storageQuotaExceeded` for service accounts.
 - Permanent named runtime tunnel: run interactive `cloudflared login` once on Windows Admin account, then create/route a named tunnel for `wa-runtime.buseldata.com -> http://127.0.0.1:8789`; current quick tunnel + startup auto-update remains functional.
