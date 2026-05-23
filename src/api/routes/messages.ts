@@ -3,6 +3,7 @@ import { authMiddleware } from '../middleware/auth'
 import { requirePermission } from '../middleware/permission'
 import { getWagateClient } from '../../lib/supabase-rest'
 import { sendViaRuntime } from './wa-runtime'
+import type { RuntimeEnv } from './wa-runtime'
 
 interface MessageRow {
   id: string
@@ -19,6 +20,34 @@ interface MessageRow {
 interface ContactRow {
   phone_number: string
   last_message: MessageRow | null
+}
+
+type JsMessage = {
+  id: string
+  waMessageId: string
+  fromNumber: string
+  toNumber: string
+  messageType: string
+  content: string | null
+  direction: string
+  status: string
+  isFromBot: boolean
+  createdAt: string
+}
+
+function mapMessage(row: MessageRow): JsMessage {
+  return {
+    id: row.id,
+    waMessageId: row.wa_message_id ?? `msg_${row.id}`,
+    fromNumber: row.from_number,
+    toNumber: row.to_number,
+    messageType: 'text',
+    content: row.content,
+    direction: row.direction,
+    status: row.status,
+    isFromBot: false,
+    createdAt: row.created_at,
+  }
 }
 
 const messages = new Hono()
@@ -64,10 +93,31 @@ messages.get('/contacts', requirePermission('wa_send'), async (c) => {
       }
     }
 
-    const data = Array.from(contacts.values()).slice(offset, offset + limit)
-    return c.json({ data, page, limit })
+    const data = Array.from(contacts.values()).slice(offset, offset + limit).map((item) => ({
+      id: item.phone_number,
+      phoneNumber: item.phone_number,
+      name: null as string | null,
+      lastMessageAt: item.last_message?.created_at ?? null,
+      hasChatHistory: true,
+    }))
+    return c.json(data)
   } catch {
     return c.json({ error: 'Failed to fetch contacts' }, 500)
+  }
+})
+
+messages.get('/conversation/:phone', requirePermission('wa_send'), async (c) => {
+  try {
+    const phone = c.req.param('phone')
+    const client = getWagateClient()
+    const rows = await client.select<MessageRow>('messages_wagate', {
+      filter: { or: `(from_number.eq.${phone},to_number.eq.${phone})` },
+      order: 'created_at.asc',
+      limit: 100,
+    })
+    return c.json(rows.map(mapMessage))
+  } catch {
+    return c.json({ error: 'Failed to fetch conversation' }, 500)
   }
 })
 
@@ -85,7 +135,8 @@ messages.post('/send', requirePermission('wa_send'), async (c) => {
 
     const to = body.to.trim()
     const message = body.message.trim()
-    const runtimeResult = await sendViaRuntime(to, message, c.env)
+    const env: RuntimeEnv = c.env as RuntimeEnv
+    const runtimeResult = await sendViaRuntime(to, message, env)
     if (!runtimeResult.success) {
       return c.json({ error: runtimeResult.error ?? 'Failed to send message via WA runtime' }, 502)
     }
