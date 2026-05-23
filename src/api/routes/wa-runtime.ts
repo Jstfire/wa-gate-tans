@@ -34,7 +34,7 @@ const waRuntime = new Hono()
 
 waRuntime.use('*', authMiddleware)
 
-type RuntimeEnv = Record<string, string | undefined>
+export type RuntimeEnv = Record<string, string | undefined>
 
 function asRuntimeEnv(env: unknown): RuntimeEnv {
   return (env ?? {}) as RuntimeEnv
