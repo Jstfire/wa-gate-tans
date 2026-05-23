@@ -113,7 +113,7 @@ messages.get('/contacts', requirePermission('wa_send'), async (c) => {
       for (const raw of [message.from_number, message.to_number]) {
         if (!raw) continue
         const phone = stripChatSuffix(raw)
-        if (phone === ownNumber || phone === 'system') continue
+        if (phone === ownNumber || phone === 'system' || !phone.startsWith('62')) continue
         if (!contacts.has(phone)) {
           contacts.set(phone, { phone_number: phone, last_message: message })
         }
