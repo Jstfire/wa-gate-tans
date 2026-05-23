@@ -22,6 +22,10 @@ interface ContactRow {
   last_message: MessageRow | null
 }
 
+interface WaAccountNumberRow {
+  phone_number: string | null
+}
+
 type JsMessage = {
   id: string
   waMessageId: string
@@ -48,6 +52,25 @@ function mapMessage(row: MessageRow): JsMessage {
     isFromBot: false,
     createdAt: row.created_at,
   }
+}
+
+function stripChatSuffix(value: string): string {
+  return value.replace(/@c\.us$|@g\.us$|@lid$/g, '')
+}
+
+function chatVariants(value: string): string[] {
+  const trimmed = value.trim()
+  const base = stripChatSuffix(trimmed)
+  return Array.from(new Set([trimmed, base, `${base}@c.us`, `${base}@lid`].filter(Boolean)))
+}
+
+function orEquals(columnNames: string[], values: string[]): string {
+  return columnNames.flatMap((column) => values.map((value) => `${column}.eq.${value}`)).join(',')
+}
+
+async function getOwnNumber(client = getWagateClient()): Promise<string> {
+  const accountRows = await client.select<WaAccountNumberRow>('wa_accounts_wagate', { limit: 1 })
+  return stripChatSuffix(accountRows[0]?.phone_number ?? '')
 }
 
 const messages = new Hono()
@@ -84,13 +107,12 @@ messages.get('/contacts', requirePermission('wa_send'), async (c) => {
 
     const rows = await client.select<MessageRow>('messages_wagate', { order: 'created_at.desc', limit: 200 })
     const contacts = new Map<string, ContactRow>()
-    const accountRows = await client.select<{ phone_number: string }>('wa_accounts_wagate', { limit: 1 })
-    const ownNumber = accountRows[0]?.phone_number ?? ''
+    const ownNumber = await getOwnNumber(client)
 
     for (const message of rows) {
       for (const raw of [message.from_number, message.to_number]) {
         if (!raw) continue
-        const phone = raw.replace(/@lid$/, '')
+        const phone = stripChatSuffix(raw)
         if (phone === ownNumber) continue
         if (!contacts.has(phone)) {
           contacts.set(phone, { phone_number: phone, last_message: message })
@@ -114,9 +136,10 @@ messages.get('/contacts', requirePermission('wa_send'), async (c) => {
 messages.get('/conversation/:phone', requirePermission('wa_send'), async (c) => {
   try {
     const phone = c.req.param('phone')
+    const variants = chatVariants(phone)
     const client = getWagateClient()
     const rows = await client.select<MessageRow>('messages_wagate', {
-      filter: { or: `(from_number.eq.${phone},to_number.eq.${phone})` },
+      filter: { or: `(${orEquals(['from_number', 'to_number'], variants)})` },
       order: 'created_at.asc',
       limit: 100,
     })
@@ -146,7 +169,7 @@ messages.post('/send', requirePermission('wa_send'), async (c) => {
       return c.json({ error: runtimeResult.error ?? 'Failed to send message via WA runtime' }, 502)
     }
 
-    const ourNumber = process.env.WA_NUMBER ?? 'system'
+    const ourNumber = await getOwnNumber(client) || 'system'
     const messageId = runtimeResult.result?.messageId ?? `out_${crypto.randomUUID()}`
 
     const [row] = await client.insert<MessageRow>('messages_wagate', {

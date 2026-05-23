@@ -68,6 +68,10 @@ function matchRule(rules: ChatbotRuleRow[], trigger: string, parent: string | nu
 function templateContent(templates: TemplateRow[], nameOrContent: string): string {
   return templates.find((t) => t.is_active && t.name === nameOrContent)?.content ?? nameOrContent
 }
+async function ownNumber(client = getWagateClient()): Promise<string> {
+  const account = await client.selectOne<{ phone_number: string | null }>('wa_accounts_wagate', { order: 'updated_at.desc' })
+  return phoneFromChatId(account?.phone_number ?? '') || 'system'
+}
 async function sendAndLog(to: string, text: string, env?: RuntimeEnv): Promise<void> {
   const client = getWagateClient()
   let success = false
@@ -79,12 +83,12 @@ async function sendAndLog(to: string, text: string, env?: RuntimeEnv): Promise<v
   } catch (error) {
     console.error('[BOT] sendViaRuntime failed:', error instanceof Error ? error.message : error)
   }
-  await client.insert<MessageRow>('messages_wagate', { wa_message_id: msgId, from_number: process.env.WA_NUMBER ?? 'system', to_number: to, content: text, message_type: 'text', direction: 'outbound', status: success ? 'sent' : 'failed', is_from_bot: true })
+  await client.insert<MessageRow>('messages_wagate', { wa_message_id: msgId, from_number: await ownNumber(client), to_number: to, content: text, message_type: 'text', direction: 'outbound', status: success ? 'sent' : 'failed', is_from_bot: true })
 }
-async function handleBot(from: string, text: string, env?: RuntimeEnv): Promise<void> {
+async function handleBot(contactPhone: string, replyTarget: string, text: string, env?: RuntimeEnv): Promise<void> {
   const client = getWagateClient()
   const [contact, rules, templates] = await Promise.all([
-    client.selectOne<ContactRow>('contacts_wagate', { filter: { phone_number: `eq.${from}` } }),
+    client.selectOne<ContactRow>('contacts_wagate', { filter: { phone_number: `eq.${contactPhone}` } }),
     client.select<ChatbotRuleRow>('chatbot_rules_wagate', { order: 'order.asc' }),
     client.select<TemplateRow>('wa_templates_wagate'),
   ])
@@ -93,37 +97,37 @@ async function handleBot(from: string, text: string, env?: RuntimeEnv): Promise<
 
   if (!meta.lastWelcomeAt && cmd !== 'menu') {
     meta.lastWelcomeAt = new Date().toISOString()
-    await upsertContact(from, meta)
-    await sendAndLog(from, templateContent(templates, 'WELCOME_MESSAGE'), env)
+    await upsertContact(contactPhone, meta)
+    await sendAndLog(replyTarget, templateContent(templates, 'WELCOME_MESSAGE'), env)
     return
   }
 
   if (cmd === '99') {
     meta.level = null
     meta.adminMode = false
-    await upsertContact(from, meta)
-    await sendAndLog(from, templateContent(templates, 'MAIN_MENU'), env)
+    await upsertContact(contactPhone, meta)
+    await sendAndLog(replyTarget, templateContent(templates, 'MAIN_MENU'), env)
     return
   }
 
   if (meta.adminMode) {
-    if (cmd === '00') { meta.adminMode = false; meta.level = null; await upsertContact(from, meta); await sendAndLog(from, templateContent(templates, 'MAIN_MENU'), env) }
+    if (cmd === '00') { meta.adminMode = false; meta.level = null; await upsertContact(contactPhone, meta); await sendAndLog(replyTarget, templateContent(templates, 'MAIN_MENU'), env) }
     return
   }
 
   const rule = matchRule(rules, cmd, meta.level)
   if (!rule) {
     const fallback = templateContent(templates, 'MAIN_MENU')
-    await sendAndLog(from, fallback, env)
+    await sendAndLog(replyTarget, fallback, env)
     return
   }
 
   const response = templateContent(templates, rule.response_content)
-  if (rule.response_type === 'admin') { meta.adminMode = true; await upsertContact(from, meta); await sendAndLog(from, response, env); return }
-  if (rule.response_type === 'submenu') { meta.level = rule.trigger; await upsertContact(from, meta); await sendAndLog(from, response, env); return }
+  if (rule.response_type === 'admin') { meta.adminMode = true; await upsertContact(contactPhone, meta); await sendAndLog(replyTarget, response, env); return }
+  if (rule.response_type === 'submenu') { meta.level = rule.trigger; await upsertContact(contactPhone, meta); await sendAndLog(replyTarget, response, env); return }
   if (rule.response_type === 'text' || rule.response_type === 'link' || rule.response_type === 'location' || rule.response_type === 'pdf') {
-    await upsertContact(from, meta)
-    await sendAndLog(from, response, env)
+    await upsertContact(contactPhone, meta)
+    await sendAndLog(replyTarget, response, env)
     return
   }
 }
@@ -132,13 +136,13 @@ runtimeWebhook.post('/incoming', async (c) => {
   if (!isAuthorized(c.req.header('Authorization'), c.env as RuntimeEnv)) return c.json({ error: 'Unauthorized' }, 401)
   const body = await c.req.json<IncomingPayload>()
   if (typeof body.from !== 'string' || typeof body.body !== 'string') return c.json({ error: 'Invalid payload' }, 400)
-  const from = inboundPhone(body), to = typeof body.to === 'string' ? phoneFromChatId(body.to) : (process.env.WA_NUMBER ?? 'system'), text = body.body.trim()
+  const from = inboundPhone(body), to = typeof body.to === 'string' ? phoneFromChatId(body.to) : (await ownNumber()), text = body.body.trim()
   const replyTarget = typeof body.from === 'string' && body.from.includes('@') ? body.from : from
   if (!text) return c.json({ ok: true, skipped: 'empty' })
   const client = getWagateClient()
   await client.insert<MessageRow>('messages_wagate', { wa_message_id: typeof body.messageId === 'string' ? body.messageId : `in_${crypto.randomUUID()}`, from_number: from, to_number: to, content: text, message_type: 'text', direction: 'inbound', status: 'received' })
   try {
-    await handleBot(replyTarget, text, c.env as RuntimeEnv)
+    await handleBot(from, replyTarget, text, c.env as RuntimeEnv)
   } catch (error) {
     return c.json({ ok: true, botError: error instanceof Error ? error.message : String(error) })
   }

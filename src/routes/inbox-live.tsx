@@ -28,14 +28,27 @@ function InboxLivePage() {
   const loadContacts = async () => {
     const data = await fetchJson<Contact[]>('/api/messages/contacts')
     setContacts(data)
-    if (!selectedContact() && data[0]) setSelectedContact(data[0].phoneNumber)
+    if (!selectedContact() && data[0]) {
+      setSelectedContact(data[0].phoneNumber)
+      void loadMessages(true)
+    }
     setLoadingContacts(false)
   }
-  const loadMessages = async () => {
+  const sameMessages = (next: Message[]): boolean => {
+    const current = messages()
+    if (current.length !== next.length) return false
+    return current.every((msg, index) => msg.id === next[index]?.id && msg.status === next[index]?.status && msg.content === next[index]?.content)
+  }
+
+  const loadMessages = async (showSkeleton = false) => {
     const phone = selectedContact(); if (!phone) return
-    setLoadingMessages(true)
-    setMessages(await fetchJson<Message[]>(`/api/messages/conversation/${phone}`))
-    setLoadingMessages(false)
+    if (showSkeleton) setLoadingMessages(true)
+    try {
+      const next = await fetchJson<Message[]>(`/api/messages/conversation/${encodeURIComponent(phone)}`)
+      if (!sameMessages(next)) setMessages(next)
+    } finally {
+      if (showSkeleton) setLoadingMessages(false)
+    }
   }
 
   onMount(() => {
@@ -47,7 +60,7 @@ function InboxLivePage() {
 
   const filteredContacts = createMemo(() => { const term = search().toLowerCase().trim(); return term ? contacts().filter((contact) => `${contact.name ?? ''} ${contact.phoneNumber}`.toLowerCase().includes(term)) : contacts() })
   const activeContact = createMemo(() => contacts().find((contact) => contact.phoneNumber === selectedContact()))
-  const chooseContact = (phone: string) => { setSelectedContact(phone); void loadMessages() }
+  const chooseContact = (phone: string) => { setSelectedContact(phone); void loadMessages(true) }
   const handleSend = async () => {
     const to = selectedContact(), message = messageText().trim(); if (!to || !message || sending()) return
     setSending(true)
