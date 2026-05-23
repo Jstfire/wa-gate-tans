@@ -33,6 +33,11 @@ interface BlastRecipient {
   created_at: string
 }
 
+interface ContactHistoryRow {
+  phone_number: string
+  has_chat_history: boolean | null
+}
+
 const blast = new Hono()
 
 blast.use('*', authMiddleware)
@@ -77,12 +82,26 @@ blast.post('/', requirePermission('wa_blast'), async (c: ApiContext) => {
       return c.json({ error: 'No valid phone numbers provided' }, 400)
     }
 
+    const historyRows = await client.select<ContactHistoryRow>('contacts_wagate', {
+      select: 'phone_number,has_chat_history',
+      filter: { phone_number: `in.(${phones.join(',')})` },
+    })
+    const allowedPhones = new Set(
+      historyRows.filter((row) => row.has_chat_history === true).map((row) => row.phone_number)
+    )
+    const filteredPhones = phones.filter((phone) => allowedPhones.has(phone))
+    const rejectedPhones = phones.filter((phone) => !allowedPhones.has(phone))
+
+    if (filteredPhones.length === 0) {
+      return c.json({ error: 'No recipients have prior chat history', rejectedRecipients: rejectedPhones }, 400)
+    }
+
     const [job] = await client.insert<BlastJob>('blast_jobs_wagate', {
       name: body.name.trim(),
       template_id: typeof body.templateId === 'string' ? body.templateId : null,
       message_content: body.messageContent.trim(),
       status: 'draft',
-      total_recipients: phones.length,
+      total_recipients: filteredPhones.length,
       sent_count: 0,
       failed_count: 0,
     })
@@ -91,10 +110,10 @@ blast.post('/', requirePermission('wa_blast'), async (c: ApiContext) => {
 
     await client.insert<BlastRecipient>(
       'blast_recipients_wagate',
-      phones.map((phone) => ({ job_id: job.id, phone_number: phone, status: 'pending' }))
+      filteredPhones.map((phone) => ({ job_id: job.id, phone_number: phone, status: 'pending' }))
     )
 
-    return c.json(job, 201)
+    return c.json({ ...job, accepted_recipients: filteredPhones.length, rejected_recipients: rejectedPhones }, 201)
   } catch {
     return c.json({ error: 'Failed to create blast job' }, 500)
   }
