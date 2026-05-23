@@ -1,6 +1,7 @@
 import { Hono } from 'hono'
 import { authMiddleware } from '../middleware/auth'
 import { requirePermission } from '../middleware/permission'
+import { getWagateClient } from '../../lib/supabase-rest'
 
 type RuntimeStatus = {
   status: string
@@ -132,6 +133,7 @@ waRuntime.post('/qr/refresh/:kind', requirePermission('wa_connect'), async (c) =
 waRuntime.get('/status', requirePermission('wa_connect'), async (c) => {
   try {
     const data = await runtimeFetch<RuntimeStatus>('/api/status', {}, asRuntimeEnv(c.env))
+    void upsertAccountFromStatus(data, 'windows-primary')
     return c.json({ ...data, runtimeSource: 'windows-primary' })
   } catch (error) {
     return c.json({ status: 'error', error: error instanceof Error ? error.message : 'Failed to reach WA runtime', runtimeSource: 'windows-primary' }, 502)
@@ -152,6 +154,24 @@ waRuntime.get('/status/all', requirePermission('wa_connect'), async (c) => {
   }))
   return c.json({ data })
 })
+
+type WaAccountRow = { id: string; phone_number: string | null; name: string | null; status: string; last_connected_at: string | null }
+
+async function upsertAccountFromStatus(data: RuntimeStatus, runtimeSource: string): Promise<void> {
+  if (!data.account?.wid) return
+  try {
+    const client = getWagateClient()
+    const phone = data.account.wid
+    const name = data.account.pushname ?? null
+    const now = new Date().toISOString()
+    const existing = await client.selectOne<WaAccountRow>('wa_accounts_wagate', { filter: { phone_number: `eq.${phone}` } })
+    const payload: Record<string, string | null> = { phone_number: phone, name, status: data.status, runtime_source: runtimeSource, last_connected_at: data.readyAt ?? now, updated_at: now }
+    if (existing) await client.update<WaAccountRow>('wa_accounts_wagate', payload, { phone_number: `eq.${phone}` })
+    else await client.insert<WaAccountRow>('wa_accounts_wagate', { ...payload, created_at: now })
+  } catch (error) {
+    console.error('[WA-APP] upsertAccountFromStatus failed:', error instanceof Error ? error.message : error)
+  }
+}
 
 waRuntime.get('/qr/by/:kind', requirePermission('wa_connect'), async (c) => {
   const key = envValue(asRuntimeEnv(c.env), 'WA_RUNTIME_API_KEY')
