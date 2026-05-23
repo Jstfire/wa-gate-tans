@@ -31,7 +31,6 @@ $env:PORT = "8789"
 $env:WA_RUNTIME_API_KEY = [Environment]::GetEnvironmentVariable("WA_RUNTIME_API_KEY", "User")
 if (-not $env:WA_RUNTIME_API_KEY) { Log "ERROR: WA_RUNTIME_API_KEY user env var not set"; exit 1 }
 # key loaded from user env var, never hard-coded
-# old placeholder removed: "jMAf8FtVgb70SaVH6NlJBhGoAu0UX3h4DxQQUU9vNMc"
 $env:WA_GATE_ORIGIN = "https://wa-gate.buseldata.com"
 $env:WA_RUNTIME_AUTO_START = "true"
 $env:WWEBJS_AUTH_PATH = "C:\laragon\www\wa-gate-tans\.wwebjs_auth"
@@ -66,7 +65,7 @@ if (-not $ready) {
 # Start cloudflared quick tunnel
 Log "Starting cloudflared tunnel for port 8789..."
 $cfLog = "C:\laragon\www\wa-gate-tans\cloudflared-runtime.log"
-$cfJob = Start-Process -FilePath "C:\Users\Admin\AppData\Roaming\9router\bin\cloudflared.exe" `
+$cfJob = Start-Process -FilePath "C:\Users\Admin\AppData\Local\cloudflared\cloudflared.exe" `
   -ArgumentList "tunnel", "--url", "http://127.0.0.1:8789", "--no-autoupdate", "--logfile", $cfLog, "--loglevel", "info" `
   -WindowStyle Hidden `
   -PassThru

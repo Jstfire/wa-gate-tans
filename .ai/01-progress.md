@@ -106,8 +106,18 @@
    - Google Drive card now queries authenticated `/api/content/drive/status` live and shows mode/folder/status plus refresh button instead of stale “Perlu refresh token”.
    - Verification: `bun run lint` and `bun run build` passed.
 
+### Latest autonomous continuation (2026-05-23 — runtime persistence/tooling hardening)
+9. **Cloudflared binary made independent from 9router path:**
+   - Downloaded official `cloudflared.exe` to `C:\\Users\\Admin\\AppData\\Local\\cloudflared\\cloudflared.exe` and verified version `2026.5.0`.
+   - Patched `wa-runtime-startup.ps1` to use that stable local binary instead of the missing/implicit `9router` cloudflared path.
+   - Removed stale runtime API key placeholder comment from startup script; key is now loaded only from Windows User env var `WA_RUNTIME_API_KEY`.
+   - Named/permanent Cloudflare Tunnel setup checked but blocked because `cloudflared tunnel list/create` requires an origin cert from interactive `cloudflared login`; no `cert.pem` exists yet.
+   - Production route SSR smoke passed for login/dashboard/WA/templates/chatbot/officers/content/blast/api-keys/users/settings/inbox-live.
+   - Root `bun run lint` and `bun run build` passed; deployed Worker version `80461a30-a8e3-49b6-9712-e906677003f4`.
+
 ### Pending
 - Google Drive upload: service-account health OK, but actual PDF upload needs target folder inside Google Shared Drive because normal My Drive folder returns `storageQuotaExceeded` for service accounts.
+- Permanent named runtime tunnel: run interactive `cloudflared login` once on Windows Admin account, then create/route a named tunnel for `wa-runtime.buseldata.com -> http://127.0.0.1:8789`; current quick tunnel + startup auto-update remains functional.
 - Scan QR on backup Koyeb only if backup failover needs to be fully active.
 - 4-view visual QA: desktop dark/light passed; mobile dark passed; mobile light needs manual/clean-session recheck.
 - QA WA Blast dispatcher with real 2–3 allowed-history recipients only when safe; current production has no active queued/running blast job.
