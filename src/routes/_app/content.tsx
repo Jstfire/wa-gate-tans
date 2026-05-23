@@ -53,6 +53,7 @@ function ContentPage() {
   const [uploadName, setUploadName] = createSignal('')
   const [uploadCategory, setUploadCategory] = createSignal('')
   const [uploadFile, setUploadFile] = createSignal<File | null>(null)
+  const [uploadError, setUploadError] = createSignal<string | null>(null)
 
   const [items, setItems] = createSignal<ContentItem[]>([])
   const [loading, setLoading] = createSignal(true)
@@ -87,11 +88,12 @@ function ContentPage() {
 
   onMount(() => { fetchItems() })
 
-  const closeUpload = () => { setUploadOpen(false); setUploadName(''); setUploadCategory(''); setUploadFile(null) }
+  const closeUpload = () => { setUploadOpen(false); setUploadName(''); setUploadCategory(''); setUploadFile(null); setUploadError(null) }
 
   const handleUpload = async () => {
     const file = uploadFile()
     if (!file) return
+    setUploadError(null)
     setUploading(true)
     try {
       const fd = new FormData()
@@ -103,11 +105,15 @@ function ContentPage() {
         headers: authHeader(),
         body: fd,
       })
-      if (!res.ok) throw new Error('Upload failed')
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({ error: 'Upload failed' })) as { error?: string; detail?: string }
+        throw new Error(body.detail ?? body.error ?? 'Upload failed')
+      }
       closeUpload()
       await fetchItems()
-    } catch {
-      // keep dialog open on error
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : 'Upload gagal'
+      setUploadError(detail.includes('invalid_grant') ? 'Koneksi Google Drive belum aktif. Pasang Service Account secret lalu coba lagi.' : detail)
     } finally {
       setUploading(false)
     }
@@ -165,14 +171,16 @@ function ContentPage() {
           <DialogHeader><DialogTitle>Upload File</DialogTitle></DialogHeader>
           <form onSubmit={(e) => { e.preventDefault(); handleUpload() }} class="space-y-4">
             <div class="flex flex-col gap-1">
-              <label class="text-sm font-medium text-slate-700 dark:text-slate-300">File *</label>
-              <input type="file" required onChange={(e) => { const f = e.currentTarget.files?.[0]; if (f) setUploadFile(f) }} class="text-sm text-slate-700 dark:text-slate-300" />
+              <label class="text-sm font-medium text-slate-700 dark:text-slate-300">File PDF *</label>
+              <input type="file" accept="application/pdf,.pdf" required onChange={(e) => { const f = e.currentTarget.files?.[0]; if (f) setUploadFile(f) }} class="text-sm text-slate-700 dark:text-slate-300" />
+              <p class="text-xs text-slate-500 dark:text-slate-400">Unggah file PDF untuk materi chatbot atau konten WhatsApp.</p>
             </div>
-            <Input label="Nama" value={uploadName()} onInput={(e) => setUploadName(e.currentTarget.value)} placeholder="Opsional, default nama file" />
-            <Input label="Kategori" value={uploadCategory()} onInput={(e) => setUploadCategory(e.currentTarget.value)} />
+            <Input label="Nama" value={uploadName()} onInput={(e) => setUploadName(e.currentTarget.value)} placeholder="Opsional, gunakan nama file jika kosong" />
+            <Input label="Kategori" value={uploadCategory()} onInput={(e) => setUploadCategory(e.currentTarget.value)} placeholder="Opsional, contoh: Publikasi PST" />
+            {uploadError() && <div class="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900 dark:bg-red-950 dark:text-red-200">{uploadError()}</div>}
             <DialogFooter>
               <Button type="button" variant="outline" onClick={closeUpload}>Batal</Button>
-              <Button type="submit" disabled={uploading()}>{uploading() ? 'Mengunggah...' : 'Upload'}</Button>
+              <Button type="submit" disabled={uploading() || !uploadFile()}>{uploading() ? 'Mengunggah...' : 'Upload'}</Button>
             </DialogFooter>
           </form>
         </DialogContent>

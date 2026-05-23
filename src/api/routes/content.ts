@@ -85,8 +85,9 @@ content.post('/upload', requirePermission('content'), async (c: ApiContext) => {
 
     return c.json(row, 201)
   } catch (error) {
-    console.error('Content upload error:', error)
-    return c.json({ error: 'Failed to upload file' }, 500)
+    const detail = error instanceof Error ? error.message : String(error)
+    console.error('Content upload error:', detail)
+    return c.json({ error: 'Failed to upload file', detail }, 500)
   }
 })
 
