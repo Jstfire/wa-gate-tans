@@ -84,7 +84,8 @@ messages.get('/contacts', requirePermission('wa_send'), async (c) => {
 
     const rows = await client.select<MessageRow>('messages_wagate', { order: 'created_at.desc', limit: 200 })
     const contacts = new Map<string, ContactRow>()
-    const ownNumber = process.env.WA_NUMBER ?? ''
+    const accountRows = await client.select<{ phone_number: string }>('wa_accounts_wagate', { limit: 1 })
+    const ownNumber = accountRows[0]?.phone_number ?? ''
 
     for (const message of rows) {
       for (const raw of [message.from_number, message.to_number]) {
