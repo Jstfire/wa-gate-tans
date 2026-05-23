@@ -5,13 +5,16 @@
 ### Current production
 - App domain: `https://wa-gate.buseldata.com`
 - Worker: `wa-gate-tans`
-- Latest deployed version ID: `946ea2ad-5f88-4335-ae3a-2050ec6b10f7`
-- Previous verified QR refresh deploy: `6f691e5d-4c7b-46dc-af22-60b7ab4036ae`
+- Latest deployed version ID: `9d20c368-61c9-4867-9d7a-dc986b812799`
+- Previous runtime reconnect deploy: `fbd78a2a-1e6f-4393-a8b0-7da291229490`
+- Latest wrangler deployments list ID observed before login-theme deploy: `91247c66-179a-475d-9aad-fe3c8a8bb0bc`
 
 ### Latest code changes deployed
-- `f4e4597 fix: make QR reactive by passing qrFor accessor into RuntimeCard`
-- `21788e6 docs: update progress and QA with QR refresh verification`
-- `4979fee chore: ignore custom API catch-all from route tree`
+- `0c60299 docs: verify bot E2E working after runtime reconnect`
+- `dd3e76f docs: record bot regression triage and runtime reconnect`
+- `63235b5 fix: remove --single-process flag, ignore wwebjs auth dirs from eslint/git`
+- `b9a7b7e fix: make settings page persistence truthful`
+- `57eb98a fix: make datatable row selection visible`
 
 ### Build/deploy validation
 - `bun run lint` passed.

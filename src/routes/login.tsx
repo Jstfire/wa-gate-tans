@@ -34,11 +34,11 @@ function LoginPage() {
   }
 
   return (
-    <main class="min-h-screen bg-[#0b141a] text-white">
+    <main class="min-h-screen bg-slate-50 text-slate-900 dark:bg-[#0b141a] dark:text-white">
       <div class="absolute inset-0 overflow-hidden">
         <div class="absolute -left-28 -top-28 h-72 w-72 rounded-full bg-emerald-500/20 blur-3xl" />
         <div class="absolute -right-24 bottom-0 h-80 w-80 rounded-full bg-cyan-500/10 blur-3xl" />
-        <div class="absolute inset-0 bg-[linear-gradient(135deg,rgba(17,27,33,0.96),rgba(11,20,26,0.98))]" />
+        <div class="absolute inset-0 bg-[linear-gradient(135deg,rgba(240,253,244,0.97),rgba(236,253,245,0.98))] dark:bg-[linear-gradient(135deg,rgba(17,27,33,0.96),rgba(11,20,26,0.98))]" />
       </div>
 
       <section class="relative mx-auto grid min-h-screen max-w-6xl items-center gap-8 px-5 py-8 lg:grid-cols-[1fr_420px] lg:px-8">
@@ -46,32 +46,32 @@ function LoginPage() {
           <div class="mb-8 flex items-center gap-3">
             <div class="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#00a884] text-lg font-black text-[#07130f] shadow-lg shadow-emerald-500/20">WA</div>
             <div>
-              <p class="text-xl font-semibold tracking-tight">WA Gate</p>
-              <p class="text-xs uppercase tracking-[0.25em] text-emerald-200/70">BPS Kabupaten Buton Selatan</p>
+              <p class="text-xl font-semibold tracking-tight text-slate-900 dark:text-white">WA Gate</p>
+              <p class="text-xs uppercase tracking-[0.25em] text-emerald-700 dark:text-emerald-200/70">BPS Kabupaten Buton Selatan</p>
             </div>
           </div>
 
-          <div class="mb-5 inline-flex rounded-full border border-emerald-300/20 bg-emerald-300/10 px-4 py-2 text-sm text-emerald-100">
+          <div class="mb-5 inline-flex rounded-full border border-emerald-300/40 bg-white/70 px-4 py-2 text-sm text-emerald-800 shadow-sm dark:border-emerald-300/20 dark:bg-emerald-300/10 dark:text-emerald-100">
             Platform layanan WhatsApp terpadu
           </div>
 
-          <h1 class="text-4xl font-semibold leading-tight tracking-tight md:text-5xl lg:text-6xl">
+          <h1 class="text-4xl font-semibold leading-tight tracking-tight text-slate-950 dark:text-white md:text-5xl lg:text-6xl">
             Kelola layanan WhatsApp lebih cepat, rapi, dan aman.
           </h1>
-          <p class="mt-5 max-w-xl text-base leading-7 text-slate-300 md:text-lg">
+          <p class="mt-5 max-w-xl text-base leading-7 text-slate-600 dark:text-slate-300 md:text-lg">
             Dashboard operasional untuk inbox, chatbot, template pesan, konten layanan, API key, dan pengiriman blast dengan kontrol human-like sending.
           </p>
 
           <div class="mt-8 grid max-w-2xl grid-cols-2 gap-3 sm:grid-cols-3">
             <For each={features}>{(feature) => (
-              <div class="rounded-2xl border border-white/10 bg-white/[0.06] px-4 py-3 text-sm font-medium text-slate-100 backdrop-blur">
+              <div class="rounded-2xl border border-emerald-200 bg-white/80 px-4 py-3 text-sm font-medium text-slate-700 shadow-sm backdrop-blur dark:border-white/10 dark:bg-white/[0.06] dark:text-slate-100">
                 {feature}
               </div>
             )}</For>
           </div>
         </div>
 
-        <div class="w-full rounded-[28px] border border-white/10 bg-white/[0.08] p-2 shadow-2xl shadow-black/30 backdrop-blur-xl">
+        <div class="w-full rounded-[28px] border border-slate-200 bg-white/80 p-2 shadow-2xl shadow-black/10 backdrop-blur-xl dark:border-white/10 dark:bg-white/[0.08] dark:shadow-black/30">
           <div class="rounded-[22px] bg-white p-6 text-slate-950 shadow-xl dark:bg-[#111b21] dark:text-white md:p-7">
             <div class="mb-7">
               <p class="text-sm font-semibold text-[#00a884]">Masuk Dashboard</p>

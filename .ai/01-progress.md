@@ -1,10 +1,18 @@
 # WA Gate - Progress Tracker
 
-## Status: Primary Runtime Healthy — Bot Reply @lid Verified — Continuing GDrive/QA
+## Status: Bot E2E Verified — Runtime Reconnected — Continuing Tunnel Permanence + Remaining Tasks
 
-## Current (2026-05-23 ~09:25 UTC+8)
+## Current (2026-05-23 ~16:00 WIB)
 
 ### Latest fixes this session
+0. **Bot no-reply recovery + runtime hardening:**
+   - Restarted Windows WA runtime, scanned QR, verified runtime `connected`.
+   - Updated Cloudflare Worker runtime secrets for current runtime tunnel and API key.
+   - Verified E2E bot flow: `POST /api/runtime/incoming` returned 200, inbound inserted, outbound bot greeting status `sent`.
+   - Added `wa-runtime-startup.ps1` and Windows Startup shortcut to auto-start runtime + quick cloudflared tunnel on login; Task Scheduler registration was blocked by Windows access denied.
+   - Patched login page hardcoded dark outer theme so light mode now actually changes background, hero text, badges, and login shell.
+   - Lint/build passed and deployed latest Worker version `9d20c368-61c9-4867-9d7a-dc986b812799`.
+
 1. **Permanent Google Drive connection:**
    - Replaced `googleapis` OAuth-only Drive client with native fetch Drive client.
    - Added preferred Service Account JWT auth (`GOOGLE_SERVICE_ACCOUNT_JSON`) so Drive access can be permanent and not depend on expiring OAuth refresh tokens.
