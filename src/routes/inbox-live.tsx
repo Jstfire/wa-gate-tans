@@ -13,7 +13,7 @@ function tokenHeader(): HeadersInit { const token = typeof window === 'undefined
 async function fetchJson<T>(url: string): Promise<T> { const res = await fetch(url, { headers: tokenHeader() }); if (!res.ok) throw new Error('Gagal memuat data'); return res.json() as Promise<T> }
 function displayName(contact: Contact | undefined, phone: string | null): string { return contact?.name || contact?.phoneNumber || phone || 'Pilih chat' }
 function initials(value: string): string { return value.replace(/[^a-zA-Z0-9]/g, '').slice(0, 2).toUpperCase() || 'WA' }
-function formatTime(value: string | null): string { if (!value) return ''; return new Date(value).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) }
+function formatTime(value: string | null): string { if (!value) return ''; return new Date(value).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }).replace('.', ':') }
 
 function InboxLivePage() {
   const [selectedContact, setSelectedContact] = createSignal<string | null>(null)
