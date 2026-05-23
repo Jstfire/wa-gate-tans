@@ -82,6 +82,14 @@
    - `DELETE /api/content/:id` now validates UUID before constructing REST filter.
    - Verification: root `bun run lint` and `bun run build` passed.
 
+### Latest autonomous continuation (2026-05-23 — DataTable row selection UX)
+7. **Generic TanStack DataTable row selection made visible/actionable:**
+   - Added first-column checkboxes for row selection and page-level select-all.
+   - Added selected-row counter and optional bulk-delete action surface.
+   - Added stable `getRowId` prop so future table pages can identify selected rows by UUID instead of row index.
+   - Fixed loading/empty `colSpan` to include the selection column.
+   - Verification: `bun run lint` and `bun run build` passed.
+
 ### Pending
 - Google Drive upload: service-account health OK, but actual PDF upload needs target folder inside Google Shared Drive because normal My Drive folder returns `storageQuotaExceeded` for service accounts.
 - Scan QR on backup Koyeb only if backup failover needs to be fully active.
