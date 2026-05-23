@@ -115,6 +115,20 @@
    - Production route SSR smoke passed for login/dashboard/WA/templates/chatbot/officers/content/blast/api-keys/users/settings/inbox-live.
    - Root `bun run lint` and `bun run build` passed; deployed Worker version `80461a30-a8e3-49b6-9712-e906677003f4`.
 
+### Latest autonomous continuation (2026-05-23 — chatbot parity + inbox-live fix)
+10. **Inbox Live skeleton fixed:**
+   - Root cause: `loadContacts()` did not clear loading state when `/api/messages/contacts` failed/unauthorized.
+   - Fix: `src/routes/inbox-live.tsx` now wraps contact loading in `try/catch/finally`, preserving old contacts and always setting `loadingContacts=false`.
+   - Live browser QA: `/inbox-live` after 5s had `animate-pulse=0` and displayed empty/auth state instead of endless skeleton.
+11. **Chatbot engine rewritten to mirror `bot-wa-pst/src/handlers/router.ts`:**
+   - Root cause: previous production webhook used generic `chatbot_rules_wagate` lookup and missed bot-wa-pst behavior (`menu`, session level, WAITING-first sequences, admin mode, multi-message responses).
+   - Fix: `src/api/routes/runtime-webhook.ts` now persists `menuActive`, `level`, `adminMode`, `lastWelcomeAt` in contact metadata and implements top-level options 1–8 plus submenus for Perpustakaan, Rekomendasi, Konsultasi, KCDA.
+   - First-ever `menu` now skips welcome and opens the main menu directly.
+   - Required templates all verified active in `wa_templates_wagate`; stale XSS QA template `<script>alert(1)</script>` was removed.
+   - Production webhook QA: option `5` after `menu` created outbound sequence `WAITING` → `STATISTIK_UMUM` → `WEB_BUSEL` → `THANKS` → `MAIN_MENU_NEXT` in `messages_wagate`.
+   - Note: test number `6289616370100` is also active Admin 1 in `officer_numbers_wagate`, so admin notification to that number is expected.
+   - Build/lint passed; deployed versions `85571f79-7f50-43f6-8d1e-af6aedb54323` then `95e05b05-6360-4c55-9b68-34f369929e2b`.
+
 ### Pending
 - Google Drive upload: service-account health OK, but actual PDF upload needs target folder inside Google Shared Drive because normal My Drive folder returns `storageQuotaExceeded` for service accounts.
 - Permanent named runtime tunnel: run interactive `cloudflared login` once on Windows Admin account, then create/route a named tunnel for `wa-runtime.buseldata.com -> http://127.0.0.1:8789`; current quick tunnel + startup auto-update remains functional.

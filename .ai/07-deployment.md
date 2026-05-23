@@ -5,9 +5,11 @@
 ### Current production
 - App domain: `https://wa-gate.buseldata.com`
 - Worker: `wa-gate-tans`
-- Latest deployed version ID: `9d20c368-61c9-4867-9d7a-dc986b812799`
+- Latest deployed version ID: `95e05b05-6360-4c55-9b68-34f369929e2b`
+- Previous chatbot rewrite deploy: `85571f79-7f50-43f6-8d1e-af6aedb54323`
+- Previous cloudflared/startup hardening deploy: `80461a30-a8e3-49b6-9712-e906677003f4`
 - Previous runtime reconnect deploy: `fbd78a2a-1e6f-4393-a8b0-7da291229490`
-- Latest wrangler deployments list ID observed before login-theme deploy: `91247c66-179a-475d-9aad-fe3c8a8bb0bc`
+- Previous login light-mode deploy: `9d20c368-61c9-4867-9d7a-dc986b812799`
 
 ### Latest code changes deployed
 - `0c60299 docs: verify bot E2E working after runtime reconnect`
