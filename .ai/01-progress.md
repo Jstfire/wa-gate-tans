@@ -1,6 +1,6 @@
 # WA Gate - Progress Tracker
 
-## Status: Dashboard Resilient — Runtime Tunnel Down — Continuing QA
+## Status: Primary Runtime Healthy — Bot Reply @lid Verified — Continuing GDrive/QA
 
 ## Current (2026-05-23 ~09:25 UTC+8)
 
@@ -27,15 +27,18 @@
    - `Promise.all` → `Promise.allSettled` so individual API failures don't break entire dashboard.
    - WA status shows `disconnected` instead of `unknown` when runtime unreachable.
 
-3. **Runtime `@lid` send fix pushed:**
+3. **Runtime `@lid` send fix verified E2E:**
    - `wa-gate-runtime` commit `da38117`: `toChatId` preserves `@lid`.
-   - Windows runtime needs restart + Cloudflare Tunnel restart.
+   - Windows runtime restarted on port `8789`; Cloudflare Tunnel route `wa-runtime.buseldata.com -> http://127.0.0.1:8789` is healthy.
+   - App `/api/wa/status/all` sees primary reachable/authenticated; `/api/wa/status` reports `runtimeSource=windows-primary`.
+   - Inbound `halo` from `246715******786` stored as received; bot reply sent to `246715******786@lid` with status `sent`.
 
 ### Runtime status
-- **Primary (Windows PC):** DOWN — Cloudflare Tunnel returns 502.
-  - `WA_RUNTIME_INTERNAL_URL` secret points to stale quick tunnel URL.
-  - User must restart Windows runtime + Cloudflare Tunnel service.
-- **Backup (Koyeb):** UP — reachable, status `qr_pending` (needs scan).
+- **Primary (Windows PC):** UP — Cloudflare Tunnel healthy, app sees runtime authenticated.
+  - Local runtime command: `PORT=8789 bun run start`.
+  - Public route: `https://wa-runtime.buseldata.com/api/status` returns connected/authenticated.
+  - WA account: `6285124422205` / `Badan Pusat Statistik Kabupaten Buton Selatan`.
+- **Backup (Koyeb):** UP — reachable, status `qr_pending` (needs scan only if backup failover is required).
   - Koyeb URL: `https://precise-melessa-ipds7415-39519134.koyeb.app`
 
 ### Latest commits
@@ -55,7 +58,7 @@
 - All SSR routes: ✅ HTTP 200
 
 ### Pending
-- Restart Windows runtime + Cloudflare Tunnel
-- Scan QR on backup Koyeb if needed
-- 4-view visual QA (desktop dark ✅, desktop light ✅, mobile pending)
-- Google Drive OAuth blocked
+- Set `GOOGLE_SERVICE_ACCOUNT_JSON` Worker secret and share Drive folder to service account as Editor.
+- Scan QR on backup Koyeb only if backup failover needs to be fully active.
+- 4-view visual QA: desktop dark/light passed; mobile dark passed; mobile light needs manual/clean-session recheck.
+- Continue content upload QA after permanent Google Drive credential is installed.
