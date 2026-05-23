@@ -89,7 +89,7 @@ export class GoogleDriveClient {
     form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json; charset=UTF-8' }))
     form.append('file', new Blob([fileBuffer], { type: mimeType }), fileName)
 
-    const response = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name,mimeType,webViewLink', {
+    const response = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&supportsAllDrives=true&fields=id,name,mimeType,webViewLink', {
       method: 'POST',
       headers: { Authorization: `Bearer ${token}` },
       body: form,
@@ -107,7 +107,7 @@ export class GoogleDriveClient {
 
   async deleteFile(fileId: string): Promise<void> {
     const token = await this.getAccessToken()
-    const response = await fetch(`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}`, {
+    const response = await fetch(`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}?supportsAllDrives=true`, {
       method: 'DELETE',
       headers: { Authorization: `Bearer ${token}` },
     })
@@ -131,7 +131,7 @@ export class GoogleDriveClient {
     const token = await this.getAccessToken()
     const query = encodeURIComponent(`'${this.folderId}' in parents and trashed=false`)
     const response = await fetch(
-      `https://www.googleapis.com/drive/v3/files?q=${query}&fields=files(id,name,mimeType)&pageSize=1000&spaces=drive`,
+      `https://www.googleapis.com/drive/v3/files?q=${query}&fields=files(id,name,mimeType)&pageSize=1000&spaces=drive&supportsAllDrives=true&includeItemsFromAllDrives=true`,
       { headers: { Authorization: `Bearer ${token}` } }
     )
     const data = await parseDriveResponse<DriveListResponse>(response)
@@ -149,7 +149,7 @@ export class GoogleDriveClient {
 
   private async makePublic(fileId: string): Promise<void> {
     const token = await this.getAccessToken()
-    const response = await fetch(`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}/permissions`, {
+    const response = await fetch(`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}/permissions?supportsAllDrives=true`, {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${token}`,
