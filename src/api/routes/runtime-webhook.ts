@@ -310,7 +310,7 @@ runtimeWebhook.post('/incoming', async (c) => {
   if (typeof body.from !== 'string' || typeof body.body !== 'string') return c.json({ error: 'Invalid payload' }, 400)
   const client = getWagateClient()
   const from = await inboundPhone(body, client), to = typeof body.to === 'string' ? normalizePossiblePhone(body.to) : (await ownNumber(client)), text = body.body.trim()
-  const replyTarget = typeof body.from === 'string' && body.from.includes('@') ? body.from : from
+  const replyTarget = looksLikePhone(from) ? from : (typeof body.from === 'string' && body.from.includes('@') ? body.from : from)
   if (!text) return c.json({ ok: true, skipped: 'empty' })
   await client.insert<MessageRow>('messages_wagate', { wa_message_id: typeof body.messageId === 'string' ? body.messageId : `in_${crypto.randomUUID()}`, from_number: from, to_number: to, content: text, message_type: 'text', direction: 'inbound', status: 'received' })
   c.executionCtx.waitUntil(
