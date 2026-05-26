@@ -172,24 +172,30 @@ messages.post('/send', requirePermission('wa_send'), async (c) => {
     const to = normalizeChatNumber(body.to.trim())
     const message = body.message.trim()
     const env: RuntimeEnv = c.env as RuntimeEnv
-    const runtimeResult = await sendViaRuntime(to, message, env)
-    if (!runtimeResult.success) {
-      return c.json({ error: runtimeResult.error ?? 'Failed to send message via WA runtime' }, 502)
-    }
-
     const ourNumber = await getOwnNumber(client) || 'system'
-    const messageId = runtimeResult.result?.messageId ?? `out_${crypto.randomUUID()}`
-
-    const [row] = await client.insert<MessageRow>('messages_wagate', {
-      wa_message_id: messageId,
+    const pendingMessageId = `out_${crypto.randomUUID()}`
+    const [pendingRow] = await client.insert<MessageRow>('messages_wagate', {
+      wa_message_id: pendingMessageId,
       from_number: ourNumber,
       to_number: to,
       content: message,
       direction: 'outbound',
-      status: 'sent',
+      status: 'sending',
     })
 
-    return c.json({ ...mapMessage(row), runtime: runtimeResult.result }, 201)
+    try {
+      const runtimeResult = await sendViaRuntime(to, message, env)
+      if (!runtimeResult.success) {
+        const [failedRow] = await client.update<MessageRow>('messages_wagate', { status: 'failed' }, { id: `eq.${pendingRow.id}` })
+        return c.json({ ...mapMessage(failedRow ?? pendingRow), error: runtimeResult.error ?? 'Failed to send message via WA runtime' }, 202)
+      }
+      const [sentRow] = await client.update<MessageRow>('messages_wagate', { status: 'sent', wa_message_id: runtimeResult.result?.messageId ?? pendingMessageId }, { id: `eq.${pendingRow.id}` })
+      return c.json({ ...mapMessage(sentRow ?? pendingRow), runtime: runtimeResult.result }, 201)
+    } catch (error) {
+      // Runtime may time out after WhatsApp has accepted the message; keep the row so refresh does not lose history.
+      const [unknownRow] = await client.update<MessageRow>('messages_wagate', { status: 'sent' }, { id: `eq.${pendingRow.id}` })
+      return c.json({ ...mapMessage(unknownRow ?? pendingRow), warning: error instanceof Error ? error.message : 'Runtime response unknown' }, 202)
+    }
   } catch (error) {
     return c.json({ error: error instanceof Error ? error.message : 'Failed to send message' }, 500)
   }

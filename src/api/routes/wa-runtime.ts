@@ -88,7 +88,7 @@ async function runtimeFetchFrom<T>(url: string, key: string, path: string, init:
 
 async function runtimeFetch<T>(path: string, init: RequestInit = {}, env?: RuntimeEnv): Promise<T> {
   const { urls, key } = runtimeConfig(env)
-  const timeoutMs = path === '/api/send' ? 45_000 : path === '/api/qr' ? 12_000 : 8_000
+  const timeoutMs = path === '/api/send' ? 180_000 : path === '/api/qr' ? 12_000 : 8_000
   let lastError: unknown = null
   for (const url of urls) {
     try { return await runtimeFetchFrom<T>(url, key, path, init, timeoutMs) }
