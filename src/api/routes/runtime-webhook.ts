@@ -45,11 +45,24 @@ runtimeWebhook.post('/session', async (c) => {
 function isAuthorized(header: string | undefined, env?: RuntimeEnv): boolean { const key = (env?.WA_RUNTIME_API_KEY ?? process.env.WA_RUNTIME_API_KEY ?? ''); return Boolean(key) && header === `Bearer ${key}` }
 function phoneFromChatId(value: string): string { return value.replace(/@c\.us$|@g\.us$|@lid$/g, '') }
 function looksLikePhone(value: string): boolean { return /^62\d{7,15}$/.test(value) }
-function inboundPhone(body: IncomingPayload): string {
-  const from = typeof body.from === 'string' ? phoneFromChatId(body.from) : ''
-  const contact = typeof body.contactNumber === 'string' ? phoneFromChatId(body.contactNumber) : ''
+function normalizePossiblePhone(value: string): string {
+  const stripped = phoneFromChatId(value).replace(/\D/g, '')
+  if (stripped.startsWith('0')) return `62${stripped.slice(1)}`
+  if (stripped.startsWith('8')) return `62${stripped}`
+  return stripped
+}
+async function resolveLidToRecentRecipient(client: ReturnType<typeof getWagateClient>): Promise<string | null> {
+  const rows = await client.select<MessageRow>('messages_wagate', { order: 'created_at.desc', limit: 20 })
+  const recent = rows.find((row) => row.direction === 'outbound' && looksLikePhone(normalizePossiblePhone(row.to_number)) && !row.content.startsWith('Pengguna '))
+  return recent ? normalizePossiblePhone(recent.to_number) : null
+}
+async function inboundPhone(body: IncomingPayload, client: ReturnType<typeof getWagateClient>): Promise<string> {
+  const from = typeof body.from === 'string' ? normalizePossiblePhone(body.from) : ''
+  const contact = typeof body.contactNumber === 'string' ? normalizePossiblePhone(body.contactNumber) : ''
   if (looksLikePhone(from)) return from
   if (looksLikePhone(contact)) return contact
+  const recentRecipient = await resolveLidToRecentRecipient(client)
+  if (recentRecipient) return recentRecipient
   return from || contact || 'unknown'
 }
 function metadataObject(value: JsonValue): JsonObject { return value && typeof value === 'object' && !Array.isArray(value) ? value : {} }
@@ -288,10 +301,10 @@ runtimeWebhook.post('/incoming', async (c) => {
   if (!isAuthorized(c.req.header('Authorization'), c.env as RuntimeEnv)) return c.json({ error: 'Unauthorized' }, 401)
   const body = await c.req.json<IncomingPayload>()
   if (typeof body.from !== 'string' || typeof body.body !== 'string') return c.json({ error: 'Invalid payload' }, 400)
-  const from = inboundPhone(body), to = typeof body.to === 'string' ? phoneFromChatId(body.to) : (await ownNumber()), text = body.body.trim()
+  const client = getWagateClient()
+  const from = await inboundPhone(body, client), to = typeof body.to === 'string' ? normalizePossiblePhone(body.to) : (await ownNumber(client)), text = body.body.trim()
   const replyTarget = typeof body.from === 'string' && body.from.includes('@') ? body.from : from
   if (!text) return c.json({ ok: true, skipped: 'empty' })
-  const client = getWagateClient()
   await client.insert<MessageRow>('messages_wagate', { wa_message_id: typeof body.messageId === 'string' ? body.messageId : `in_${crypto.randomUUID()}`, from_number: from, to_number: to, content: text, message_type: 'text', direction: 'inbound', status: 'received' })
   c.executionCtx.waitUntil(
     handleBot(from, replyTarget, text, c.env as RuntimeEnv).catch((error: unknown) => {

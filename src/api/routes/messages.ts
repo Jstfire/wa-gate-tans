@@ -2,6 +2,7 @@ import { Hono } from 'hono'
 import { authMiddleware } from '../middleware/auth'
 import { requirePermission } from '../middleware/permission'
 import { getWagateClient } from '../../lib/supabase-rest'
+import { normalizePhoneNumber } from '../../lib/phone'
 import { sendViaRuntime } from './wa-runtime'
 import type { RuntimeEnv } from './wa-runtime'
 
@@ -59,10 +60,15 @@ function stripChatSuffix(value: string): string {
   return value.replace(/@c\.us$|@g\.us$|@lid$/g, '')
 }
 
+function normalizeChatNumber(value: string): string {
+  return normalizePhoneNumber(stripChatSuffix(value))
+}
+
 function chatVariants(value: string): string[] {
   const trimmed = value.trim()
   const base = stripChatSuffix(trimmed)
-  return Array.from(new Set([trimmed, base, `${base}@c.us`, `${base}@lid`].filter(Boolean)))
+  const normalized = normalizeChatNumber(trimmed)
+  return Array.from(new Set([trimmed, base, normalized, `${base}@c.us`, `${base}@lid`, `${normalized}@c.us`, `${normalized}@lid`].filter(Boolean)))
 }
 
 function orEquals(columnNames: string[], values: string[]): string {
@@ -71,7 +77,7 @@ function orEquals(columnNames: string[], values: string[]): string {
 
 async function getOwnNumber(client = getWagateClient()): Promise<string> {
   const accountRows = await client.select<WaAccountNumberRow>('wa_accounts_wagate', { limit: 1 })
-  return stripChatSuffix(accountRows[0]?.phone_number ?? '')
+  return normalizeChatNumber(accountRows[0]?.phone_number ?? '')
 }
 
 const messages = new Hono()
@@ -113,7 +119,7 @@ messages.get('/contacts', requirePermission('wa_send'), async (c) => {
     for (const message of rows) {
       for (const raw of [message.from_number, message.to_number]) {
         if (!raw) continue
-        const phone = stripChatSuffix(raw)
+        const phone = normalizeChatNumber(raw)
         if (phone === ownNumber || phone === 'system' || !phone.startsWith('62')) continue
         if (!contacts.has(phone)) {
           contacts.set(phone, { phone_number: phone, last_message: message })
@@ -163,7 +169,7 @@ messages.post('/send', requirePermission('wa_send'), async (c) => {
       return c.json({ error: 'Field "message" is required' }, 400)
     }
 
-    const to = body.to.trim()
+    const to = normalizeChatNumber(body.to.trim())
     const message = body.message.trim()
     const env: RuntimeEnv = c.env as RuntimeEnv
     const runtimeResult = await sendViaRuntime(to, message, env)
