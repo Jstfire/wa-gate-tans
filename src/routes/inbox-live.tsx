@@ -1,5 +1,6 @@
 import { createFileRoute, redirect } from '@tanstack/solid-router'
 import { createMemo, createSignal, For, onCleanup, onMount, Show } from 'solid-js'
+import type { JSX } from 'solid-js'
 
 export const Route = createFileRoute('/inbox-live')({
   beforeLoad: () => { if (typeof window !== 'undefined' && !localStorage.getItem('wa-gate-token')) throw redirect({ to: '/login' }) },
@@ -17,6 +18,13 @@ function displayName(contact: Contact | undefined, phone: string | null): string
 function initials(value: string): string { return value.replace(/[^a-zA-Z0-9]/g, '').slice(0, 2).toUpperCase() || 'WA' }
 function formatTime(value: string | null): string { if (!value) return ''; return new Date(value).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }).replace('.', ':') }
 function makePendingMessage(to: string, text: string): Message { return { id: `pending_${crypto.randomUUID()}`, waMessageId: `pending_${Date.now()}`, fromNumber: 'me', toNumber: to, messageType: 'text', content: text, direction: 'outbound', status: 'sending', isFromBot: false, createdAt: new Date().toISOString() } }
+function isPendingMessage(message: Message): boolean { return message.id.startsWith('pending_') }
+function messageKey(message: Message): string { return `${message.direction}:${message.toNumber}:${message.content ?? ''}` }
+function mergeServerMessages(current: Message[], next: Message[]): Message[] {
+  const serverKeys = new Set(next.map(messageKey))
+  const pending = current.filter((message) => isPendingMessage(message) && !serverKeys.has(messageKey(message)))
+  return [...next, ...pending]
+}
 
 function InboxLivePage() {
   const [selectedContact, setSelectedContact] = createSignal<string | null>(null)
@@ -46,7 +54,8 @@ function InboxLivePage() {
     if (showSkeleton) setLoadingMessages(true)
     try {
       const next = await fetchJson<Message[]>(`/api/messages/conversation/${encodeURIComponent(phone)}`)
-      if (!sameMessages(next)) setMessages(next)
+      const merged = mergeServerMessages(messages(), next)
+      if (!sameMessages(merged)) setMessages(merged)
     } finally {
       if (showSkeleton) setLoadingMessages(false)
     }
@@ -118,7 +127,7 @@ function InboxLivePage() {
   )
 }
 function iconButtonClass(light: boolean): string { return `flex h-10 w-10 items-center justify-center rounded-full ${light ? 'text-[#54656f] hover:bg-[#e9edef]' : 'text-[#aebac1] hover:bg-[#2a3942]'}` }
-function IconButton(props: { title: string; onClick: () => void; children: unknown; mobileOnly?: boolean }) { return <button type="button" onClick={props.onClick} class={`${iconButtonClass(false)} ${props.mobileOnly ? 'md:hidden' : ''}`} title={props.title}>{props.children}</button> }
+function IconButton(props: { title: string; onClick: () => void; children: JSX.Element; mobileOnly?: boolean }) { return <button type="button" onClick={props.onClick} class={`${iconButtonClass(false)} ${props.mobileOnly ? 'md:hidden' : ''}`} title={props.title}>{props.children}</button> }
 function Avatar(props: { label: string }) { return <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#6a7175] text-sm font-semibold text-white">{props.label}</div> }
 function ContactSkeleton(props: { light: boolean }) { return <div class="p-3"><For each={Array.from({ length: 8 })}>{() => <div class={`mb-3 h-14 animate-pulse rounded-xl ${props.light ? 'bg-[#f0f2f5]' : 'bg-[#202c33]'}`} />}</For></div> }
 function MessageSkeleton(props: { light: boolean }) { return <div class="flex flex-col gap-3"><For each={Array.from({ length: 6 })}>{(_, index) => <div class={`h-12 w-64 animate-pulse rounded-lg ${props.light ? 'bg-white' : 'bg-[#202c33]'} ${index() % 2 ? 'self-end' : 'self-start'}`} />}</For></div> }
