@@ -64,6 +64,17 @@ function normalizeChatNumber(value: string): string {
   return normalizePhoneNumber(stripChatSuffix(value))
 }
 
+function contactKey(value: string): string {
+  const normalized = normalizeChatNumber(value)
+  return normalized.startsWith('62') ? normalized : stripChatSuffix(value).trim()
+}
+
+function shouldShowContact(value: string, ownNumber: string): boolean {
+  if (!value || value === ownNumber || value === 'system' || value === 'status@broadcast') return false
+  if (value.includes('@g.us')) return false
+  return /^62\d{7,15}$/.test(value) || /^\d{12,18}$/.test(value)
+}
+
 function chatVariants(value: string): string[] {
   const trimmed = value.trim()
   const base = stripChatSuffix(trimmed)
@@ -119,8 +130,8 @@ messages.get('/contacts', requirePermission('wa_send'), async (c) => {
     for (const message of rows) {
       for (const raw of [message.from_number, message.to_number]) {
         if (!raw) continue
-        const phone = normalizeChatNumber(raw)
-        if (phone === ownNumber || phone === 'system' || !phone.startsWith('62')) continue
+        const phone = contactKey(raw)
+        if (!shouldShowContact(phone, ownNumber)) continue
         if (!contacts.has(phone)) {
           contacts.set(phone, { phone_number: phone, last_message: message })
         }

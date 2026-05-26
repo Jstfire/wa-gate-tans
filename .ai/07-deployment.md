@@ -5,7 +5,8 @@
 ### Current production
 - App domain: `https://wa-gate.buseldata.com`
 - Worker: `wa-gate-tans`
-- Latest deployed version ID: `8807e66b-3ae5-4256-91ef-a916cdba546e`
+- Latest deployed version ID: `dcde8f1b-9289-4309-bd9e-5f4b706f694e`
+- Previous inbox LID visibility deploy: `8807e66b-3ae5-4256-91ef-a916cdba546e`
 - Previous inbox send persistence deploy: `88e1ae89-f78d-4ee8-9a2f-280bd8048dc9`
 - Previous inbox new-chat format label deploy: `608d629f-4e7e-47f0-a776-bb245cd85f4c`
 - Previous inbox realtime polling deploy: `745e2d3c-f0f4-4037-a37c-8040cb534bf8`
