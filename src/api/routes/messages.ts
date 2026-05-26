@@ -134,7 +134,7 @@ messages.get('/contacts', requirePermission('wa_send'), async (c) => {
       lastMessageAt: item.last_message?.created_at ?? null,
       hasChatHistory: true,
     }))
-    return c.json(data)
+    return c.json(data, 200, { 'Cache-Control': 'no-store, no-cache, must-revalidate' })
   } catch {
     return c.json({ error: 'Failed to fetch contacts' }, 500)
   }
@@ -151,7 +151,7 @@ messages.get('/conversation/:phone', requirePermission('wa_send'), async (c) => 
       order: 'created_at.asc',
       limit: 100,
     })
-    return c.json(rows.map(mapMessage))
+    return c.json(rows.map(mapMessage), 200, { 'Cache-Control': 'no-store, no-cache, must-revalidate' })
   } catch {
     return c.json({ error: 'Failed to fetch conversation' }, 500)
   }

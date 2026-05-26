@@ -13,7 +13,12 @@ type Message = { id: string; waMessageId: string; fromNumber: string; toNumber: 
 type ThemeMode = 'light' | 'dark'
 
 function tokenHeader(): HeadersInit { const token = typeof window === 'undefined' ? null : localStorage.getItem('wa-gate-token'); return token ? { Authorization: `Bearer ${token}` } : {} }
-async function fetchJson<T>(url: string): Promise<T> { const res = await fetch(url, { headers: tokenHeader() }); if (!res.ok) throw new Error('Gagal memuat data'); return res.json() as Promise<T> }
+function withRealtimeNonce(url: string): string { return `${url}${url.includes('?') ? '&' : '?'}_=${Date.now()}` }
+async function fetchJson<T>(url: string): Promise<T> {
+  const res = await fetch(withRealtimeNonce(url), { headers: { ...tokenHeader(), 'Cache-Control': 'no-cache' }, cache: 'no-store' })
+  if (!res.ok) throw new Error('Gagal memuat data')
+  return res.json() as Promise<T>
+}
 function displayName(contact: Contact | undefined, phone: string | null): string { return contact?.name || contact?.phoneNumber || phone || 'Pilih chat' }
 function initials(value: string): string { return value.replace(/[^a-zA-Z0-9]/g, '').slice(0, 2).toUpperCase() || 'WA' }
 function formatTime(value: string | null): string { if (!value) return ''; return new Date(value).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }).replace('.', ':') }
@@ -84,9 +89,11 @@ function InboxLivePage() {
   onMount(() => {
     applyTheme(localStorage.getItem('theme') === 'light' ? 'light' : 'dark')
     void loadContacts()
-    const contactTimer = window.setInterval(() => { void loadContacts() }, 3000)
-    const messageTimer = window.setInterval(() => { void loadMessages() }, 1500)
-    onCleanup(() => { window.clearInterval(contactTimer); window.clearInterval(messageTimer) })
+    const realtimeTick = () => { void loadContacts(); void loadMessages() }
+    const realtimeTimer = window.setInterval(realtimeTick, 1000)
+    const onVisible = () => { if (!document.hidden) realtimeTick() }
+    document.addEventListener('visibilitychange', onVisible)
+    onCleanup(() => { window.clearInterval(realtimeTimer); document.removeEventListener('visibilitychange', onVisible) })
   })
 
   const filteredContacts = createMemo(() => { const term = search().toLowerCase().trim(); return term ? contacts().filter((contact) => `${contact.name ?? ''} ${contact.phoneNumber}`.toLowerCase().includes(term)) : contacts() })
@@ -110,7 +117,7 @@ function InboxLivePage() {
     setMessages((prev) => [...prev, optimistic])
     setSending(true)
     try {
-      const res = await fetch('/api/messages/send', { method: 'POST', headers: { ...tokenHeader(), 'Content-Type': 'application/json' }, body: JSON.stringify({ to, message }) })
+      const res = await fetch(withRealtimeNonce('/api/messages/send'), { method: 'POST', headers: { ...tokenHeader(), 'Content-Type': 'application/json', 'Cache-Control': 'no-cache' }, cache: 'no-store', body: JSON.stringify({ to, message }) })
       if (!res.ok) throw new Error('Gagal mengirim pesan')
       const saved = await res.json() as Message
       setMessages((prev) => prev.map((item) => item.id === optimistic.id ? saved : item))
