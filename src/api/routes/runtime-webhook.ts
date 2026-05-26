@@ -6,7 +6,7 @@ import type { RuntimeEnv } from './wa-runtime'
 type JsonValue = string | number | boolean | null | JsonValue[] | { [key: string]: JsonValue }
 type JsonObject = { [key: string]: JsonValue }
 
-interface IncomingPayload { from?: unknown; to?: unknown; body?: unknown; messageId?: unknown; contactNumber?: unknown; contactName?: unknown }
+interface IncomingPayload { from?: unknown; to?: unknown; body?: unknown; messageId?: unknown; contactNumber?: unknown; contactName?: unknown; contactId?: unknown; chatId?: unknown }
 interface MessageRow { id: string; from_number: string; to_number: string; content: string; direction: string; status: string; wa_message_id: string | null; created_at: string }
 interface ContactRow { id: string; phone_number: string; name: string | null; metadata: JsonValue; has_chat_history: boolean }
 interface WaAccountRow { id: string; phone_number: string | null; name: string | null; status: string; session_data: JsonValue; created_at: string }
@@ -59,8 +59,12 @@ async function resolveLidToRecentRecipient(client: ReturnType<typeof getWagateCl
 async function inboundPhone(body: IncomingPayload, client: ReturnType<typeof getWagateClient>): Promise<string> {
   const from = typeof body.from === 'string' ? normalizePossiblePhone(body.from) : ''
   const contact = typeof body.contactNumber === 'string' ? normalizePossiblePhone(body.contactNumber) : ''
+  const contactId = typeof body.contactId === 'string' ? normalizePossiblePhone(body.contactId) : ''
+  const chatId = typeof body.chatId === 'string' ? normalizePossiblePhone(body.chatId) : ''
   if (looksLikePhone(from)) return from
   if (looksLikePhone(contact)) return contact
+  if (looksLikePhone(contactId)) return contactId
+  if (looksLikePhone(chatId)) return chatId
   const recentRecipient = await resolveLidToRecentRecipient(client)
   if (recentRecipient) return recentRecipient
   return from || contact || 'unknown'
@@ -173,8 +177,11 @@ async function sendAndLog(to: string, text: string, env?: RuntimeEnv): Promise<v
 async function notifyAdmins(fromPhone: string, msgText: string, env?: RuntimeEnv): Promise<void> {
   const client = getWagateClient()
   const officers = await client.select<{ phone_number: string }>('officer_numbers_wagate', { filter: { is_active: 'eq.true' } })
-  const safePhone = looksLikePhone(fromPhone) ? fromPhone : 'nomor-tidak-terdeteksi'
-  const note = `Pengguna ${safePhone} meminta bantuan admin. Pesan terakhir: "${msgText}". Silakan respon dari akun WA Business PST BPS.`
+  if (!looksLikePhone(fromPhone)) {
+    console.error('[BOT] skip admin notification: unresolved WhatsApp phone', phoneFromChatId(fromPhone))
+    return
+  }
+  const note = `Pengguna ${fromPhone} meminta bantuan admin. Pesan terakhir: "${msgText}". Silakan respon dari Inbox WA Gate.`
   for (const o of officers) { await sendAndLog(o.phone_number, note, env) }
 }
 async function enterAdminMode(replyTarget: string, contactPhone: string, meta: SessionMeta, templates: TemplateRow[], env?: RuntimeEnv): Promise<void> {
