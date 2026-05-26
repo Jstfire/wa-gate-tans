@@ -323,16 +323,21 @@ async function sendHumanLike(to: string, message: string, simulateTyping: boolea
   let microDelayMs = 0
 
   if (simulateTyping) {
-    const chat = await withTimeout(client.getChatById(chatId), 8_000, 'getChatById')
-    typingMs = Math.min(calculateTypingMs(message.length), 8_000)
-    await withTimeout(chat.sendStateTyping(), 5_000, 'sendStateTyping')
-    try {
-      await sleep(typingMs)
-    } finally {
-      await withTimeout(chat.clearState().catch(() => undefined), 5_000, 'clearState').catch(() => undefined)
+    const chat = await withTimeout(client.getChatById(chatId), 8_000, 'getChatById').catch((err: unknown) => {
+      console.warn('[WA-RUNTIME] typing skipped:', err instanceof Error ? err.message : String(err))
+      return null
+    })
+    if (chat) {
+      typingMs = Math.min(calculateTypingMs(message.length), 8_000)
+      await withTimeout(chat.sendStateTyping(), 5_000, 'sendStateTyping')
+      try {
+        await sleep(typingMs)
+      } finally {
+        await withTimeout(chat.clearState().catch(() => undefined), 5_000, 'clearState').catch(() => undefined)
+      }
+      microDelayMs = 500 + Math.round(Math.random() * 1000)
+      await sleep(microDelayMs)
     }
-    microDelayMs = 500 + Math.round(Math.random() * 1000)
-    await sleep(microDelayMs)
   }
 
   const sent = await withTimeout(client.sendMessage(chatId, message), 25_000, 'sendMessage')

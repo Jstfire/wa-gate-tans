@@ -5,7 +5,8 @@
 ### Current production
 - App domain: `https://wa-gate.buseldata.com`
 - Worker: `wa-gate-tans`
-- Latest deployed version ID: `2b976e30-6e4b-4da2-b539-5355d64f3aef`
+- Latest deployed version ID: `f3bfc03b-6510-4d95-a1d1-7f8f78a22fec`
+- Previous inbox message_type insert fix deploy: `2b976e30-6e4b-4da2-b539-5355d64f3aef`
 - Previous inbox send status constraint fix deploy: `222fba8e-bcdc-4104-b677-3bf59c0f4853`
 - Previous inbound real-number notification deploy: `dcde8f1b-9289-4309-bd9e-5f4b706f694e`
 - Previous inbox LID visibility deploy: `8807e66b-3ae5-4256-91ef-a916cdba546e`
