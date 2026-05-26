@@ -101,7 +101,7 @@ function InboxLivePage() {
   const chooseContact = (phone: string) => { setSelectedContact(phone); void loadMessages(true) }
   const startNewChat = () => {
     const phone = normalizeNewChatPhone(newChatPhone())
-    if (!phone) { setNewChatError('Nomor harus format 08..., 628..., atau +628...'); return }
+    if (!phone) { setNewChatError('Nomor harus format 08..., 628..., +628..., 62 817-..., atau +62 817-...'); return }
     setNewChatError(null)
     setNewChatPhone('')
     setContacts((prev) => prev.some((contact) => contact.phoneNumber === phone) ? prev : [{ id: phone, phoneNumber: phone, name: null, lastMessageAt: null, hasChatHistory: false }, ...prev])
@@ -144,7 +144,7 @@ function InboxLivePage() {
             <div class={`flex h-9 items-center gap-3 rounded-lg px-3 ${isLight() ? 'bg-[#f0f2f5] text-[#54656f]' : 'bg-[#202c33] text-[#8696a0]'}`}><SearchIcon /><input value={search()} onInput={(event) => setSearch(event.currentTarget.value)} placeholder="Cari percakapan" class={`w-full bg-transparent text-sm outline-none ${isLight() ? 'text-[#111b21] placeholder:text-[#667781]' : 'text-[#e9edef] placeholder:text-[#8696a0]'}`} /></div>
             <div class={`rounded-lg border p-2 ${isLight() ? 'border-[#e9edef] bg-[#f7f8fa]' : 'border-[#2a3942] bg-[#202c33]'}`}>
               <div class="flex items-center gap-2">
-                <input value={newChatPhone()} onInput={(event) => { setNewChatPhone(event.currentTarget.value); setNewChatError(null) }} onKeyDown={(event) => { if (event.key === 'Enter') startNewChat() }} placeholder="Nomor baru: 08..., 628..., +628..." class={`min-w-0 flex-1 bg-transparent text-sm outline-none ${isLight() ? 'text-[#111b21] placeholder:text-[#667781]' : 'text-[#e9edef] placeholder:text-[#8696a0]'}`} />
+                <input value={newChatPhone()} onInput={(event) => { setNewChatPhone(event.currentTarget.value); setNewChatError(null) }} onKeyDown={(event) => { if (event.key === 'Enter') startNewChat() }} placeholder="Nomor baru: 08..., 628..., +628..., 62 817-..." class={`min-w-0 flex-1 bg-transparent text-sm outline-none ${isLight() ? 'text-[#111b21] placeholder:text-[#667781]' : 'text-[#e9edef] placeholder:text-[#8696a0]'}`} />
                 <button type="button" onClick={startNewChat} class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#00a884] text-white hover:bg-[#06cf9c]" title="Mulai chat baru"><NewChatIcon /></button>
               </div>
               <Show when={newChatError()}><p class="mt-1 text-xs text-red-500">{newChatError()}</p></Show>
