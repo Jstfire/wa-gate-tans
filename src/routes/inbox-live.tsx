@@ -17,6 +17,11 @@ async function fetchJson<T>(url: string): Promise<T> { const res = await fetch(u
 function displayName(contact: Contact | undefined, phone: string | null): string { return contact?.name || contact?.phoneNumber || phone || 'Pilih chat' }
 function initials(value: string): string { return value.replace(/[^a-zA-Z0-9]/g, '').slice(0, 2).toUpperCase() || 'WA' }
 function formatTime(value: string | null): string { if (!value) return ''; return new Date(value).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }).replace('.', ':') }
+function normalizeNewChatPhone(input: string): string | null {
+  const digits = input.replace(/\D/g, '')
+  const normalized = digits.startsWith('0') ? `62${digits.slice(1)}` : digits.startsWith('8') ? `62${digits}` : digits
+  return /^62\d{8,15}$/.test(normalized) ? normalized : null
+}
 function makePendingMessage(to: string, text: string): Message { return { id: `pending_${crypto.randomUUID()}`, waMessageId: `pending_${Date.now()}`, fromNumber: 'me', toNumber: to, messageType: 'text', content: text, direction: 'outbound', status: 'sending', isFromBot: false, createdAt: new Date().toISOString() } }
 function isPendingMessage(message: Message): boolean { return message.id.startsWith('pending_') }
 function messageKey(message: Message): string { return `${message.direction}:${message.toNumber}:${message.content ?? ''}` }
@@ -30,6 +35,8 @@ function InboxLivePage() {
   const [selectedContact, setSelectedContact] = createSignal<string | null>(null)
   const [messageText, setMessageText] = createSignal('')
   const [search, setSearch] = createSignal('')
+  const [newChatPhone, setNewChatPhone] = createSignal('')
+  const [newChatError, setNewChatError] = createSignal<string | null>(null)
   const [contacts, setContacts] = createSignal<Contact[]>([])
   const [messages, setMessages] = createSignal<Message[]>([])
   const [loadingContacts, setLoadingContacts] = createSignal(true)
@@ -85,6 +92,16 @@ function InboxLivePage() {
   const filteredContacts = createMemo(() => { const term = search().toLowerCase().trim(); return term ? contacts().filter((contact) => `${contact.name ?? ''} ${contact.phoneNumber}`.toLowerCase().includes(term)) : contacts() })
   const activeContact = createMemo(() => contacts().find((contact) => contact.phoneNumber === selectedContact()))
   const chooseContact = (phone: string) => { setSelectedContact(phone); void loadMessages(true) }
+  const startNewChat = () => {
+    const phone = normalizeNewChatPhone(newChatPhone())
+    if (!phone) { setNewChatError('Nomor harus format 08..., 628..., atau +628...'); return }
+    setNewChatError(null)
+    setNewChatPhone('')
+    setContacts((prev) => prev.some((contact) => contact.phoneNumber === phone) ? prev : [{ id: phone, phoneNumber: phone, name: null, lastMessageAt: null, hasChatHistory: false }, ...prev])
+    setSelectedContact(phone)
+    setMessages([])
+    void loadMessages(true)
+  }
 
   const handleSend = async () => {
     const to = selectedContact(), message = messageText().trim(); if (!to || !message || sending()) return
@@ -116,8 +133,15 @@ function InboxLivePage() {
               <a href="/dashboard" class={iconButtonClass(isLight())} title="Dashboard"><HomeIcon /></a>
             </div>
           </div>
-          <div class={`p-2 ${isLight() ? 'bg-white' : 'bg-[#111b21]'}`}>
-            <div class={`flex h-9 items-center gap-3 rounded-lg px-3 ${isLight() ? 'bg-[#f0f2f5] text-[#54656f]' : 'bg-[#202c33] text-[#8696a0]'}`}><SearchIcon /><input value={search()} onInput={(event) => setSearch(event.currentTarget.value)} placeholder="Cari atau mulai chat baru" class={`w-full bg-transparent text-sm outline-none ${isLight() ? 'text-[#111b21] placeholder:text-[#667781]' : 'text-[#e9edef] placeholder:text-[#8696a0]'}`} /></div>
+          <div class={`space-y-2 p-2 ${isLight() ? 'bg-white' : 'bg-[#111b21]'}`}>
+            <div class={`flex h-9 items-center gap-3 rounded-lg px-3 ${isLight() ? 'bg-[#f0f2f5] text-[#54656f]' : 'bg-[#202c33] text-[#8696a0]'}`}><SearchIcon /><input value={search()} onInput={(event) => setSearch(event.currentTarget.value)} placeholder="Cari percakapan" class={`w-full bg-transparent text-sm outline-none ${isLight() ? 'text-[#111b21] placeholder:text-[#667781]' : 'text-[#e9edef] placeholder:text-[#8696a0]'}`} /></div>
+            <div class={`rounded-lg border p-2 ${isLight() ? 'border-[#e9edef] bg-[#f7f8fa]' : 'border-[#2a3942] bg-[#202c33]'}`}>
+              <div class="flex items-center gap-2">
+                <input value={newChatPhone()} onInput={(event) => { setNewChatPhone(event.currentTarget.value); setNewChatError(null) }} onKeyDown={(event) => { if (event.key === 'Enter') startNewChat() }} placeholder="Nomor baru: 08..., 628..., +628..." class={`min-w-0 flex-1 bg-transparent text-sm outline-none ${isLight() ? 'text-[#111b21] placeholder:text-[#667781]' : 'text-[#e9edef] placeholder:text-[#8696a0]'}`} />
+                <button type="button" onClick={startNewChat} class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#00a884] text-white hover:bg-[#06cf9c]" title="Mulai chat baru"><NewChatIcon /></button>
+              </div>
+              <Show when={newChatError()}><p class="mt-1 text-xs text-red-500">{newChatError()}</p></Show>
+            </div>
           </div>
           <div class="flex-1 overflow-y-auto"><Show when={!loadingContacts()} fallback={<ContactSkeleton light={isLight()} />}><For each={filteredContacts()} fallback={<EmptyContacts light={isLight()} />}>{(contact) => (<button type="button" onClick={() => chooseContact(contact.phoneNumber)} class={`flex w-full items-center gap-3 border-b px-3 py-3 text-left ${isLight() ? 'border-[#f0f2f5] hover:bg-[#f5f6f6]' : 'border-[#222e35] hover:bg-[#202c33]'} ${selectedContact() === contact.phoneNumber ? (isLight() ? 'bg-[#f0f2f5]' : 'bg-[#2a3942]') : ''}`}><Avatar label={initials(contact.name ?? contact.phoneNumber)} /><div class="min-w-0 flex-1"><div class="flex items-center justify-between gap-3"><p class={isLight() ? 'truncate text-[16px] text-[#111b21]' : 'truncate text-[16px] text-[#e9edef]'}>{contact.name ?? contact.phoneNumber}</p><span class={isLight() ? 'shrink-0 text-xs text-[#667781]' : 'shrink-0 text-xs text-[#8696a0]'}>{formatTime(contact.lastMessageAt)}</span></div><p class={isLight() ? 'truncate text-sm text-[#667781]' : 'truncate text-sm text-[#8696a0]'}>{contact.phoneNumber}</p></div></button>)}</For></Show></div>
         </aside>
@@ -140,5 +164,6 @@ function BackIcon() { return <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none
 function MoreIcon() { return <svg class="h-5 w-5 text-[#aebac1]" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg> }
 function AttachIcon() { return <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/></svg> }
 function SendIcon() { return <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4 20-7z"/></svg> }
+function NewChatIcon() { return <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg> }
 function ChatIcon() { return <svg class="h-14 w-14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" /></svg> }
 function StatusIcon(props: { status: string }) { return props.status === 'failed' ? <svg class="h-3.5 w-3.5 text-red-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M18 6L6 18M6 6l12 12"/></svg> : <svg class="h-4 w-4 text-[#53bdeb]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 13l4 4L15 7"/><path d="M9 17L23 3"/></svg> }
