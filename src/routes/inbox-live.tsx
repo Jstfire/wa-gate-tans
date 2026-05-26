@@ -9,11 +9,14 @@ export const Route = createFileRoute('/inbox-live')({
 type Contact = { id: string; phoneNumber: string; name: string | null; lastMessageAt: string | null; hasChatHistory: boolean }
 type Message = { id: string; waMessageId: string; fromNumber: string; toNumber: string; messageType: string; content: string | null; direction: string; status: string; isFromBot: boolean; createdAt: string }
 
+type ThemeMode = 'light' | 'dark'
+
 function tokenHeader(): HeadersInit { const token = typeof window === 'undefined' ? null : localStorage.getItem('wa-gate-token'); return token ? { Authorization: `Bearer ${token}` } : {} }
 async function fetchJson<T>(url: string): Promise<T> { const res = await fetch(url, { headers: tokenHeader() }); if (!res.ok) throw new Error('Gagal memuat data'); return res.json() as Promise<T> }
 function displayName(contact: Contact | undefined, phone: string | null): string { return contact?.name || contact?.phoneNumber || phone || 'Pilih chat' }
 function initials(value: string): string { return value.replace(/[^a-zA-Z0-9]/g, '').slice(0, 2).toUpperCase() || 'WA' }
 function formatTime(value: string | null): string { if (!value) return ''; return new Date(value).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }).replace('.', ':') }
+function makePendingMessage(to: string, text: string): Message { return { id: `pending_${crypto.randomUUID()}`, waMessageId: `pending_${Date.now()}`, fromNumber: 'me', toNumber: to, messageType: 'text', content: text, direction: 'outbound', status: 'sending', isFromBot: false, createdAt: new Date().toISOString() } }
 
 function InboxLivePage() {
   const [selectedContact, setSelectedContact] = createSignal<string | null>(null)
@@ -24,28 +27,14 @@ function InboxLivePage() {
   const [loadingContacts, setLoadingContacts] = createSignal(true)
   const [loadingMessages, setLoadingMessages] = createSignal(false)
   const [sending, setSending] = createSignal(false)
-  const [lightMode, setLightMode] = createSignal(false)
+  const [theme, setTheme] = createSignal<ThemeMode>('dark')
 
-  const applyTheme = (mode: 'light' | 'dark') => {
-    setLightMode(mode === 'light')
+  const applyTheme = (mode: ThemeMode) => {
+    setTheme(mode)
     localStorage.setItem('theme', mode)
     document.documentElement.classList.toggle('dark', mode === 'dark')
   }
 
-  const loadContacts = async () => {
-    try {
-      const data = await fetchJson<Contact[]>('/api/messages/contacts')
-      setContacts(data)
-      if (!selectedContact() && data[0]) {
-        setSelectedContact(data[0].phoneNumber)
-        void loadMessages(true)
-      }
-    } catch {
-      // silently fail — keep existing contacts, skeleton will clear
-    } finally {
-      setLoadingContacts(false)
-    }
-  }
   const sameMessages = (next: Message[]): boolean => {
     const current = messages()
     if (current.length !== next.length) return false
@@ -63,56 +52,84 @@ function InboxLivePage() {
     }
   }
 
+  const loadContacts = async () => {
+    try {
+      const data = await fetchJson<Contact[]>('/api/messages/contacts')
+      setContacts(data)
+      if (!selectedContact() && data[0]) {
+        setSelectedContact(data[0].phoneNumber)
+        await loadMessages(true)
+      }
+    } finally {
+      setLoadingContacts(false)
+    }
+  }
+
   onMount(() => {
     applyTheme(localStorage.getItem('theme') === 'light' ? 'light' : 'dark')
     void loadContacts()
-    const contactTimer = window.setInterval(() => { void loadContacts() }, 7000)
-    const messageTimer = window.setInterval(() => { void loadMessages() }, 4000)
+    const contactTimer = window.setInterval(() => { void loadContacts() }, 3000)
+    const messageTimer = window.setInterval(() => { void loadMessages() }, 1500)
     onCleanup(() => { window.clearInterval(contactTimer); window.clearInterval(messageTimer) })
   })
 
   const filteredContacts = createMemo(() => { const term = search().toLowerCase().trim(); return term ? contacts().filter((contact) => `${contact.name ?? ''} ${contact.phoneNumber}`.toLowerCase().includes(term)) : contacts() })
   const activeContact = createMemo(() => contacts().find((contact) => contact.phoneNumber === selectedContact()))
   const chooseContact = (phone: string) => { setSelectedContact(phone); void loadMessages(true) }
+
   const handleSend = async () => {
     const to = selectedContact(), message = messageText().trim(); if (!to || !message || sending()) return
+    const optimistic = makePendingMessage(to, message)
+    setMessageText('')
+    setMessages((prev) => [...prev, optimistic])
     setSending(true)
     try {
       const res = await fetch('/api/messages/send', { method: 'POST', headers: { ...tokenHeader(), 'Content-Type': 'application/json' }, body: JSON.stringify({ to, message }) })
       if (!res.ok) throw new Error('Gagal mengirim pesan')
-      setMessageText(''); await loadMessages()
+      const saved = await res.json() as Message
+      setMessages((prev) => prev.map((item) => item.id === optimistic.id ? saved : item))
+      void loadContacts()
+    } catch {
+      setMessages((prev) => prev.map((item) => item.id === optimistic.id ? { ...item, status: 'failed' } : item))
     } finally { setSending(false) }
   }
 
+  const isLight = createMemo(() => theme() === 'light')
+
   return (
-    <div class={lightMode() ? 'wagate-light h-screen overflow-hidden bg-[#f0f2f5] text-[#111b21]' : 'h-screen overflow-hidden bg-[#111b21] text-[#e9edef]'}>
-      <style>{`
-        .wagate-light [class*="bg-[#0b141a]"], .wagate-light [class*="bg-[#111b21]"], .wagate-light [class*="bg-[#202c33]"] { background-color: #ffffff !important; }
-        .wagate-light [class*="bg-[#222e35]"], .wagate-light main[class*="bg-[#0b141a]"], .wagate-light .relative.flex-1 { background-color: #efeae2 !important; }
-        .wagate-light [class*="bg-[#2a3942]"] { background-color: #f0f2f5 !important; }
-        .wagate-light [class*="text-[#e9edef]"], .wagate-light p { color: #111b21 !important; }
-        .wagate-light [class*="text-[#8696a0]"], .wagate-light [class*="text-[#aebac1]"], .wagate-light span { color: #667781 !important; }
-        .wagate-light [class*="border-[#313d45]"], .wagate-light [class*="border-[#222e35]"] { border-color: #e9edef !important; }
-        .wagate-light [class*="bg-[#005c4b]"] { background-color: #d9fdd3 !important; color: #111b21 !important; }
-        .wagate-light .shadow-2xl, .wagate-light .shadow { box-shadow: none !important; }
-        .wagate-light .absolute.inset-0 { background: linear-gradient(180deg,#00a884 0 15%,#f0f2f5 15% 100%) !important; }
-      `}</style>
-      <div class="absolute inset-0 bg-[linear-gradient(180deg,#00a884_0_15%,#111b21_15%_100%)]" />
-      <div class="relative mx-auto flex h-screen max-w-[1600px] overflow-hidden bg-[#0b141a] shadow-2xl md:h-[calc(100vh-32px)] md:translate-y-4 md:rounded-sm">
-        <aside class={`${selectedContact() ? 'hidden md:flex' : 'flex'} w-full max-w-[420px] flex-col border-r border-[#313d45] bg-[#111b21] md:flex md:w-[38%] lg:w-[32%]`}>
-          <div class="flex h-[60px] items-center justify-between bg-[#202c33] px-4">
-            <div class="flex items-center gap-3"><div class="flex h-10 w-10 items-center justify-center rounded-full bg-[#00a884] font-semibold text-[#06251d]">WA</div><div><p class="text-sm font-semibold">WA Gate Inbox</p><p class="text-xs text-[#8696a0]">Primary runtime monitor</p></div></div>
-            <div class="flex items-center gap-1"><button type="button" onClick={() => applyTheme(lightMode() ? 'dark' : 'light')} class="rounded-full p-2 text-[#aebac1] hover:bg-[#2a3942]" title="Toggle tema">{lightMode() ? '🌙' : '☀️'}</button><a href="/dashboard" class="rounded-full p-2 text-[#aebac1] hover:bg-[#2a3942]" title="Dashboard"><svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12l9-9 9 9"/><path d="M5 10v10h14V10"/></svg></a></div>
+    <div class={isLight() ? 'h-dvh overflow-hidden bg-[#f0f2f5] text-[#111b21]' : 'h-dvh overflow-hidden bg-[#111b21] text-[#e9edef]'}>
+      <div class="flex h-full w-full overflow-hidden">
+        <aside class={`${selectedContact() ? 'hidden md:flex' : 'flex'} h-full w-full max-w-[480px] flex-col border-r md:flex md:w-[35%] lg:w-[30%] ${isLight() ? 'border-[#d1d7db] bg-white' : 'border-[#2a3942] bg-[#111b21]'}`}>
+          <div class={`flex h-[59px] items-center justify-between px-4 ${isLight() ? 'bg-[#f0f2f5]' : 'bg-[#202c33]'}`}>
+            <div class="flex items-center gap-3"><div class="flex h-10 w-10 items-center justify-center rounded-full bg-[#00a884] font-bold text-[#06251d]">WA</div><div><p class="text-sm font-semibold">WA Gate</p><p class={isLight() ? 'text-xs text-[#667781]' : 'text-xs text-[#8696a0]'}>BPS Buton Selatan</p></div></div>
+            <div class="flex items-center gap-1">
+              <IconButton title="Toggle tema" onClick={() => applyTheme(isLight() ? 'dark' : 'light')}><ThemeIcon light={isLight()} /></IconButton>
+              <a href="/dashboard" class={iconButtonClass(isLight())} title="Dashboard"><HomeIcon /></a>
+            </div>
           </div>
-          <div class="border-b border-[#222e35] bg-[#111b21] p-2"><div class="flex items-center gap-2 rounded-lg bg-[#202c33] px-3 py-2 text-[#8696a0]"><svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input value={search()} onInput={(event) => setSearch(event.currentTarget.value)} placeholder="Cari atau mulai chat baru" class="w-full bg-transparent text-sm text-[#e9edef] outline-none placeholder:text-[#8696a0]" /></div></div>
-          <div class="flex-1 overflow-y-auto"><Show when={!loadingContacts()} fallback={<ContactSkeleton />}><For each={filteredContacts()} fallback={<EmptyContacts />}>{(contact) => (<button type="button" onClick={() => chooseContact(contact.phoneNumber)} class={`flex w-full items-center gap-3 border-b border-[#222e35] px-3 py-3 text-left hover:bg-[#202c33] ${selectedContact() === contact.phoneNumber ? 'bg-[#2a3942]' : ''}`}><div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[#6a7175] text-sm font-semibold text-white">{initials(contact.name ?? contact.phoneNumber)}</div><div class="min-w-0 flex-1"><div class="flex items-center justify-between gap-3"><p class="truncate text-[15px] text-[#e9edef]">{contact.name ?? contact.phoneNumber}</p><span class="shrink-0 text-xs text-[#8696a0]">{formatTime(contact.lastMessageAt)}</span></div><p class="truncate text-sm text-[#8696a0]">{contact.phoneNumber}</p></div></button>)}</For></Show></div>
+          <div class={`p-2 ${isLight() ? 'bg-white' : 'bg-[#111b21]'}`}>
+            <div class={`flex h-9 items-center gap-3 rounded-lg px-3 ${isLight() ? 'bg-[#f0f2f5] text-[#54656f]' : 'bg-[#202c33] text-[#8696a0]'}`}><SearchIcon /><input value={search()} onInput={(event) => setSearch(event.currentTarget.value)} placeholder="Cari atau mulai chat baru" class={`w-full bg-transparent text-sm outline-none ${isLight() ? 'text-[#111b21] placeholder:text-[#667781]' : 'text-[#e9edef] placeholder:text-[#8696a0]'}`} /></div>
+          </div>
+          <div class="flex-1 overflow-y-auto"><Show when={!loadingContacts()} fallback={<ContactSkeleton light={isLight()} />}><For each={filteredContacts()} fallback={<EmptyContacts light={isLight()} />}>{(contact) => (<button type="button" onClick={() => chooseContact(contact.phoneNumber)} class={`flex w-full items-center gap-3 border-b px-3 py-3 text-left ${isLight() ? 'border-[#f0f2f5] hover:bg-[#f5f6f6]' : 'border-[#222e35] hover:bg-[#202c33]'} ${selectedContact() === contact.phoneNumber ? (isLight() ? 'bg-[#f0f2f5]' : 'bg-[#2a3942]') : ''}`}><Avatar label={initials(contact.name ?? contact.phoneNumber)} /><div class="min-w-0 flex-1"><div class="flex items-center justify-between gap-3"><p class={isLight() ? 'truncate text-[16px] text-[#111b21]' : 'truncate text-[16px] text-[#e9edef]'}>{contact.name ?? contact.phoneNumber}</p><span class={isLight() ? 'shrink-0 text-xs text-[#667781]' : 'shrink-0 text-xs text-[#8696a0]'}>{formatTime(contact.lastMessageAt)}</span></div><p class={isLight() ? 'truncate text-sm text-[#667781]' : 'truncate text-sm text-[#8696a0]'}>{contact.phoneNumber}</p></div></button>)}</For></Show></div>
         </aside>
-        <main class={`${selectedContact() ? 'flex' : 'hidden md:flex'} min-w-0 flex-1 flex-col bg-[#0b141a]`}><Show when={selectedContact()} fallback={<NoChatSelected />}><div class="flex h-[60px] items-center justify-between bg-[#202c33] px-3 md:px-4"><div class="flex min-w-0 items-center gap-2 md:gap-3"><button type="button" onClick={() => setSelectedContact(null)} class="rounded-full p-2 text-[#aebac1] hover:bg-[#2a3942] md:hidden" title="Kembali ke daftar chat">←</button><div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#6a7175] text-sm font-semibold">{initials(displayName(activeContact(), selectedContact()))}</div><div><p class="text-sm font-semibold">{displayName(activeContact(), selectedContact())}</p><p class="text-xs text-[#8696a0]">online via WA Gate Runtime</p></div></div></div><div class="relative flex-1 overflow-y-auto bg-[#0b141a] p-6"><div class="absolute inset-0 opacity-[0.08] [background-image:radial-gradient(circle_at_1px_1px,#e9edef_1px,transparent_0)] [background-size:22px_22px]" /><div class="relative mx-auto flex max-w-4xl flex-col gap-2"><Show when={!loadingMessages()} fallback={<MessageSkeleton />}><For each={messages()}>{(msg) => (<div class={`flex ${msg.direction === 'outbound' ? 'justify-end' : 'justify-start'}`}><div class={`max-w-[72%] rounded-lg px-3 py-2 text-[14px] leading-relaxed shadow ${msg.direction === 'outbound' ? 'bg-[#005c4b] text-[#e9edef]' : 'bg-[#202c33] text-[#e9edef]'}`}><p class="whitespace-pre-wrap">{msg.content}</p><div class="mt-1 flex items-center justify-end gap-1 text-xs text-[#aebac1]"><span>{formatTime(msg.createdAt)}</span><Show when={msg.direction === 'outbound'}><span class="text-[#53bdeb]">✓✓</span></Show></div></div></div>)}</For></Show></div></div><div class="flex min-h-[62px] items-center gap-3 bg-[#202c33] px-4 py-3"><input value={messageText()} onInput={(event) => setMessageText(event.currentTarget.value)} onKeyDown={(event) => event.key === 'Enter' && handleSend()} placeholder="Ketik pesan" class="min-h-11 flex-1 rounded-lg bg-[#2a3942] px-4 text-[15px] text-[#e9edef] outline-none placeholder:text-[#8696a0]" /><button type="button" onClick={handleSend} disabled={!messageText().trim() || sending()} class="flex h-11 w-11 items-center justify-center rounded-full bg-[#00a884] text-[#06251d] disabled:bg-[#3b4a54] disabled:text-[#8696a0]" title="Kirim" aria-label="Kirim pesan"><svg class="h-5 w-5" viewBox="0 0 24 24" fill="currentColor"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" /></svg></button></div></Show></main>
+        <main class={`${selectedContact() ? 'flex' : 'hidden md:flex'} h-full min-w-0 flex-1 flex-col ${isLight() ? 'bg-[#efeae2]' : 'bg-[#0b141a]'}`}><Show when={selectedContact()} fallback={<NoChatSelected light={isLight()} />}><div class={`flex h-[59px] items-center justify-between px-3 md:px-4 ${isLight() ? 'bg-[#f0f2f5]' : 'bg-[#202c33]'}`}><div class="flex min-w-0 items-center gap-3"><IconButton title="Kembali" onClick={() => setSelectedContact(null)} mobileOnly><BackIcon /></IconButton><Avatar label={initials(displayName(activeContact(), selectedContact()))} /><div><p class="text-sm font-semibold">{displayName(activeContact(), selectedContact())}</p><p class={isLight() ? 'text-xs text-[#667781]' : 'text-xs text-[#8696a0]'}>WhatsApp</p></div></div><MoreIcon /></div><div class="relative flex-1 overflow-y-auto px-4 py-5 md:px-16"><div class="absolute inset-0 opacity-[0.05] [background-image:radial-gradient(circle_at_1px_1px,#111b21_1px,transparent_0)] [background-size:22px_22px]" /><div class="relative mx-auto flex max-w-5xl flex-col gap-1"><Show when={!loadingMessages()} fallback={<MessageSkeleton light={isLight()} />}><For each={messages()}>{(msg) => (<div class={`flex ${msg.direction === 'outbound' ? 'justify-end' : 'justify-start'}`}><div class={`max-w-[82%] rounded-lg px-2.5 py-1.5 text-[14px] leading-relaxed shadow-sm md:max-w-[64%] ${msg.direction === 'outbound' ? (isLight() ? 'bg-[#d9fdd3] text-[#111b21]' : 'bg-[#005c4b] text-[#e9edef]') : (isLight() ? 'bg-white text-[#111b21]' : 'bg-[#202c33] text-[#e9edef]')}`}><p class="whitespace-pre-wrap break-words">{msg.content}</p><div class={`mt-1 flex items-center justify-end gap-1 text-[11px] ${isLight() ? 'text-[#667781]' : 'text-[#aebac1]'}`}><span>{formatTime(msg.createdAt)}</span><Show when={msg.direction === 'outbound'}><StatusIcon status={msg.status} /></Show></div></div></div>)}</For></Show></div></div><div class={`flex min-h-[62px] items-center gap-2 px-3 py-2 ${isLight() ? 'bg-[#f0f2f5]' : 'bg-[#202c33]'}`}><button class={iconButtonClass(isLight())} type="button"><AttachIcon /></button><input value={messageText()} onInput={(event) => setMessageText(event.currentTarget.value)} onKeyDown={(event) => { if (event.key === 'Enter') void handleSend() }} placeholder="Ketik pesan" class={`h-11 flex-1 rounded-lg px-4 text-sm outline-none ${isLight() ? 'bg-white text-[#111b21] placeholder:text-[#667781]' : 'bg-[#2a3942] text-[#e9edef] placeholder:text-[#8696a0]'}`} /><button type="button" onClick={() => void handleSend()} disabled={sending() || !messageText().trim()} class="flex h-11 w-11 items-center justify-center rounded-full bg-[#00a884] text-white disabled:opacity-50"><SendIcon /></button></div></Show></main>
       </div>
     </div>
   )
 }
-function ContactSkeleton() { return <div class="p-3"><For each={Array.from({ length: 8 })}>{() => <div class="mb-3 h-14 animate-pulse rounded-xl bg-[#202c33]" />}</For></div> }
-function MessageSkeleton() { return <div class="flex flex-col gap-3"><For each={Array.from({ length: 6 })}>{(_, index) => <div class={`h-12 w-64 animate-pulse rounded-lg bg-[#202c33] ${index() % 2 ? 'self-end' : 'self-start'}`} />}</For></div> }
-function EmptyContacts() { return <div class="p-6 text-center text-sm text-[#8696a0]">Belum ada percakapan masuk.</div> }
-function NoChatSelected() { return <div class="flex flex-1 items-center justify-center border-b-4 border-[#00a884] bg-[#222e35] text-center"><div class="max-w-md px-8"><div class="mx-auto mb-8 flex h-28 w-28 items-center justify-center rounded-full bg-[#0b141a] text-[#00a884]"><svg class="h-14 w-14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" /></svg></div><h1 class="text-3xl font-light text-[#e9edef]">WA Gate Web</h1><p class="mt-3 text-sm leading-6 text-[#8696a0]">Pilih percakapan di kiri untuk membaca dan mengirim pesan melalui nomor WhatsApp yang tertaut.</p></div></div> }
+function iconButtonClass(light: boolean): string { return `flex h-10 w-10 items-center justify-center rounded-full ${light ? 'text-[#54656f] hover:bg-[#e9edef]' : 'text-[#aebac1] hover:bg-[#2a3942]'}` }
+function IconButton(props: { title: string; onClick: () => void; children: unknown; mobileOnly?: boolean }) { return <button type="button" onClick={props.onClick} class={`${iconButtonClass(false)} ${props.mobileOnly ? 'md:hidden' : ''}`} title={props.title}>{props.children}</button> }
+function Avatar(props: { label: string }) { return <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#6a7175] text-sm font-semibold text-white">{props.label}</div> }
+function ContactSkeleton(props: { light: boolean }) { return <div class="p-3"><For each={Array.from({ length: 8 })}>{() => <div class={`mb-3 h-14 animate-pulse rounded-xl ${props.light ? 'bg-[#f0f2f5]' : 'bg-[#202c33]'}`} />}</For></div> }
+function MessageSkeleton(props: { light: boolean }) { return <div class="flex flex-col gap-3"><For each={Array.from({ length: 6 })}>{(_, index) => <div class={`h-12 w-64 animate-pulse rounded-lg ${props.light ? 'bg-white' : 'bg-[#202c33]'} ${index() % 2 ? 'self-end' : 'self-start'}`} />}</For></div> }
+function EmptyContacts(props: { light: boolean }) { return <div class={props.light ? 'p-6 text-center text-sm text-[#667781]' : 'p-6 text-center text-sm text-[#8696a0]'}>Belum ada percakapan masuk.</div> }
+function NoChatSelected(props: { light: boolean }) { return <div class={`flex flex-1 items-center justify-center border-b-4 border-[#00a884] text-center ${props.light ? 'bg-[#f8f9fa]' : 'bg-[#222e35]'}`}><div class="max-w-md px-8"><div class={`mx-auto mb-8 flex h-28 w-28 items-center justify-center rounded-full ${props.light ? 'bg-[#e9edef] text-[#54656f]' : 'bg-[#0b141a] text-[#00a884]'}`}><ChatIcon /></div><h1 class="text-3xl font-light">WA Gate Web</h1><p class={props.light ? 'mt-3 text-sm leading-6 text-[#667781]' : 'mt-3 text-sm leading-6 text-[#8696a0]'}>Pilih percakapan untuk membaca dan mengirim pesan.</p></div></div> }
+function SearchIcon() { return <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg> }
+function HomeIcon() { return <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12l9-9 9 9"/><path d="M5 10v10h14V10"/></svg> }
+function ThemeIcon(props: { light: boolean }) { return props.light ? <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.8A8 8 0 1111.2 3 6.5 6.5 0 0021 12.8z"/></svg> : <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg> }
+function BackIcon() { return <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg> }
+function MoreIcon() { return <svg class="h-5 w-5 text-[#aebac1]" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg> }
+function AttachIcon() { return <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/></svg> }
+function SendIcon() { return <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4 20-7z"/></svg> }
+function ChatIcon() { return <svg class="h-14 w-14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" /></svg> }
+function StatusIcon(props: { status: string }) { return props.status === 'failed' ? <svg class="h-3.5 w-3.5 text-red-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M18 6L6 18M6 6l12 12"/></svg> : <svg class="h-4 w-4 text-[#53bdeb]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 13l4 4L15 7"/><path d="M9 17L23 3"/></svg> }

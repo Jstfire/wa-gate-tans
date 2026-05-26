@@ -26,6 +26,7 @@ interface WaAccountNumberRow {
   phone_number: string | null
 }
 
+
 type JsMessage = {
   id: string
   waMessageId: string
@@ -105,7 +106,7 @@ messages.get('/contacts', requirePermission('wa_send'), async (c) => {
     const limit = Math.min(100, Math.max(1, Number(c.req.query('limit') ?? '20')))
     const offset = (page - 1) * limit
 
-    const rows = await client.select<MessageRow>('messages_wagate', { order: 'created_at.desc', limit: 200 })
+    const rows = await client.select<MessageRow>('messages_wagate', { order: 'created_at.desc', limit: 300 })
     const contacts = new Map<string, ContactRow>()
     const ownNumber = await getOwnNumber(client)
 
@@ -135,7 +136,8 @@ messages.get('/contacts', requirePermission('wa_send'), async (c) => {
 
 messages.get('/conversation/:phone', requirePermission('wa_send'), async (c) => {
   try {
-    const phone = c.req.param('phone')
+    const phone = c.req.param('phone') ?? ''
+    if (!phone) return c.json({ error: 'Phone is required' }, 400)
     const variants = chatVariants(phone)
     const client = getWagateClient()
     const rows = await client.select<MessageRow>('messages_wagate', {
@@ -181,7 +183,7 @@ messages.post('/send', requirePermission('wa_send'), async (c) => {
       status: 'sent',
     })
 
-    return c.json({ ...row, runtime: runtimeResult.result }, 201)
+    return c.json({ ...mapMessage(row), runtime: runtimeResult.result }, 201)
   } catch (error) {
     return c.json({ error: error instanceof Error ? error.message : 'Failed to send message' }, 500)
   }

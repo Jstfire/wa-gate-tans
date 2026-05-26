@@ -44,9 +44,13 @@ runtimeWebhook.post('/session', async (c) => {
 
 function isAuthorized(header: string | undefined, env?: RuntimeEnv): boolean { const key = (env?.WA_RUNTIME_API_KEY ?? process.env.WA_RUNTIME_API_KEY ?? ''); return Boolean(key) && header === `Bearer ${key}` }
 function phoneFromChatId(value: string): string { return value.replace(/@c\.us$|@g\.us$|@lid$/g, '') }
+function looksLikePhone(value: string): boolean { return /^62\d{7,15}$/.test(value) }
 function inboundPhone(body: IncomingPayload): string {
-  if (typeof body.contactNumber === 'string' && body.contactNumber.trim()) return phoneFromChatId(body.contactNumber)
-  return typeof body.from === 'string' ? phoneFromChatId(body.from) : 'unknown'
+  const from = typeof body.from === 'string' ? phoneFromChatId(body.from) : ''
+  const contact = typeof body.contactNumber === 'string' ? phoneFromChatId(body.contactNumber) : ''
+  if (looksLikePhone(from)) return from
+  if (looksLikePhone(contact)) return contact
+  return from || contact || 'unknown'
 }
 function metadataObject(value: JsonValue): JsonObject { return value && typeof value === 'object' && !Array.isArray(value) ? value : {} }
 function metaOf(row: ContactRow | null): SessionMeta {
@@ -153,18 +157,11 @@ async function sendAndLog(to: string, text: string, env?: RuntimeEnv): Promise<v
   }
   await client.insert<MessageRow>('messages_wagate', { wa_message_id: msgId, from_number: await ownNumber(client), to_number: to, content: text, message_type: 'text', direction: 'outbound', status: success ? 'sent' : 'failed', is_from_bot: true })
 }
-const adminNotifyCache = new Map<string, number>()
-const ADMIN_NOTIFY_MS = 24 * 60 * 60 * 1000
-function shouldNotifyAdmin(phone: string): boolean {
-  const last = adminNotifyCache.get(phone)
-  if (!last) return true
-  return Date.now() - last > ADMIN_NOTIFY_MS
-}
-function recordAdminNotify(phone: string): void { adminNotifyCache.set(phone, Date.now()) }
 async function notifyAdmins(fromPhone: string, msgText: string, env?: RuntimeEnv): Promise<void> {
   const client = getWagateClient()
   const officers = await client.select<{ phone_number: string }>('officer_numbers_wagate', { filter: { is_active: 'eq.true' } })
-  const note = `📬 Pengguna ${fromPhone} mengirim pesan: "${msgText}". Silakan respon dari akun WA Business PST BPS.`
+  const safePhone = looksLikePhone(fromPhone) ? fromPhone : 'nomor-tidak-terdeteksi'
+  const note = `Pengguna ${safePhone} meminta bantuan admin. Pesan terakhir: "${msgText}". Silakan respon dari akun WA Business PST BPS.`
   for (const o of officers) { await sendAndLog(o.phone_number, note, env) }
 }
 async function enterAdminMode(replyTarget: string, contactPhone: string, meta: SessionMeta, templates: TemplateRow[], env?: RuntimeEnv): Promise<void> {
@@ -173,6 +170,7 @@ async function enterAdminMode(replyTarget: string, contactPhone: string, meta: S
   await upsertContact(contactPhone, meta)
   await sendAndLog(replyTarget, templateContent(templates, 'ADMIN_JAM'), env)
   await sendAndLog(replyTarget, templateContent(templates, 'ADMIN_END'), env)
+  await notifyAdmins(contactPhone, 'meminta bantuan admin', env)
 }
 async function handleBot(contactPhone: string, replyTarget: string, text: string, env?: RuntimeEnv): Promise<void> {
   const client = getWagateClient()
@@ -217,14 +215,9 @@ async function handleBot(contactPhone: string, replyTarget: string, text: string
     return
   }
 
-  // 5. Not in menu — notify admins once per 24h, ignore
-  if (!meta.menuActive) {
-    if (shouldNotifyAdmin(contactPhone)) {
-      recordAdminNotify(contactPhone)
-      await notifyAdmins(contactPhone, text, env)
-    }
-    return
-  }
+  // 5. Not in menu — match bot-wa-pst user flow for normal chats: do not notify officers.
+  // Officers are notified only when the visitor explicitly chooses Chat Admin.
+  if (!meta.menuActive) return
 
   // 6. In menu — route by level
   if (!meta.level) {
