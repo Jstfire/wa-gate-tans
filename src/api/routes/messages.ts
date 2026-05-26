@@ -191,7 +191,7 @@ messages.post('/send', requirePermission('wa_send'), async (c) => {
       to_number: to,
       content: message,
       direction: 'outbound',
-      status: 'sending',
+      status: 'sent',
     })
 
     try {
