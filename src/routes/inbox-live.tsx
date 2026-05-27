@@ -172,8 +172,8 @@ function InboxLivePage() {
   const isLight = createMemo(() => theme() === 'light')
 
   return (
-    <div class={isLight() ? 'h-dvh overflow-hidden bg-[#d9dbd5] text-[#111b21] lg:p-5' : 'h-dvh overflow-hidden bg-[#0c1317] text-[#e9edef] lg:p-5'}>
-      <div class="mx-auto flex h-full w-full max-w-[1600px] overflow-hidden shadow-2xl">
+    <div class={isLight() ? 'h-dvh overflow-hidden bg-[#d9dbd5] text-[#111b21]' : 'h-dvh overflow-hidden bg-[#0c1317] text-[#e9edef]'}>
+      <div class="flex h-full w-full overflow-hidden">
         <aside class={`${selectedContact() ? 'hidden md:flex' : 'flex'} h-full w-full max-w-[520px] flex-col border-r md:flex md:w-[39%] lg:w-[32%] xl:w-[30%] ${isLight() ? 'border-[#d1d7db] bg-white' : 'border-[#2a3942] bg-[#111b21]'}`}>
           <div class={`relative flex h-[59px] items-center justify-between px-4 ${isLight() ? 'bg-white' : 'bg-[#111b21]'}`}>
             <h1 class="text-[22px] font-bold tracking-[-0.02em]">Chats</h1>
