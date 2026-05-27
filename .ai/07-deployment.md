@@ -5,7 +5,8 @@
 ### Current production
 - App domain: `https://wa-gate.buseldata.com`
 - Worker: `wa-gate-tans`
-- Latest deployed version ID: `6bd93811-a537-4d44-9042-6e568e413277`
+- Latest deployed version ID: `7c4bf764-543a-45ca-8a85-ca9a8f39f3fb`
+- Previous Inbox Live WhatsApp formatting/actions deploy: `6bd93811-a537-4d44-9042-6e568e413277`
 - Previous unsafe LID recent-recipient fallback removal deploy: `82550a93-385d-4de3-a696-9a7950296b70`
 - Previous bot LID grouping fix deploy: `f3bfc03b-6510-4d95-a1d1-7f8f78a22fec`
 - Previous inbox message_type insert fix deploy: `2b976e30-6e4b-4da2-b539-5355d64f3aef`
