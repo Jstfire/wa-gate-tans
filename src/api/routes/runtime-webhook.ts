@@ -51,11 +51,6 @@ function normalizePossiblePhone(value: string): string {
   if (stripped.startsWith('8')) return `62${stripped}`
   return stripped
 }
-async function resolveLidToRecentRecipient(client: ReturnType<typeof getWagateClient>): Promise<string | null> {
-  const rows = await client.select<MessageRow>('messages_wagate', { order: 'created_at.desc', limit: 20 })
-  const recent = rows.find((row) => row.direction === 'outbound' && looksLikePhone(normalizePossiblePhone(row.to_number)) && !row.content.startsWith('Pengguna '))
-  return recent ? normalizePossiblePhone(recent.to_number) : null
-}
 async function inboundPhone(body: IncomingPayload, client: ReturnType<typeof getWagateClient>): Promise<string> {
   const from = typeof body.from === 'string' ? normalizePossiblePhone(body.from) : ''
   const contact = typeof body.contactNumber === 'string' ? normalizePossiblePhone(body.contactNumber) : ''
@@ -65,9 +60,8 @@ async function inboundPhone(body: IncomingPayload, client: ReturnType<typeof get
   if (looksLikePhone(contact)) return contact
   if (looksLikePhone(contactId)) return contactId
   if (looksLikePhone(chatId)) return chatId
-  const recentRecipient = await resolveLidToRecentRecipient(client)
-  if (recentRecipient) return recentRecipient
-  return from || contact || 'unknown'
+  void client
+  return from || contactId || chatId || contact || 'unknown'
 }
 function metadataObject(value: JsonValue): JsonObject { return value && typeof value === 'object' && !Array.isArray(value) ? value : {} }
 function metaOf(row: ContactRow | null): SessionMeta {
