@@ -21,8 +21,8 @@ async function fetchJson<T>(url: string): Promise<T> {
   if (!res.ok) throw new Error('Gagal memuat data')
   return res.json() as Promise<T>
 }
-function isLidNumber(value: string | null): boolean { return Boolean(value && /^\d{12,18}$/.test(value) && !value.startsWith('62')) }
-function displayPhone(value: string | null): string { return isLidNumber(value) ? `ID WhatsApp ${value}` : value ?? '' }
+function isDisplayablePhone(value: string | null): boolean { return Boolean(value && /^62\d{7,15}$/.test(value)) }
+function displayPhone(value: string | null): string { return isDisplayablePhone(value) ? value ?? '' : '' }
 function displayName(contact: Contact | undefined, phone: string | null): string { return contact?.name || displayPhone(contact?.phoneNumber ?? phone) || 'Pilih chat' }
 function initials(value: string): string { return value.replace(/[^a-zA-Z0-9]/g, '').slice(0, 2).toUpperCase() || 'WA' }
 function formatTime(value: string | null): string { if (!value) return ''; return new Date(value).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }).replace('.', ':') }

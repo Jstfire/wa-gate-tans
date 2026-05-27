@@ -303,9 +303,12 @@ runtimeWebhook.post('/incoming', async (c) => {
   const body = await c.req.json<IncomingPayload>()
   if (typeof body.from !== 'string' || typeof body.body !== 'string') return c.json({ error: 'Invalid payload' }, 400)
   const client = getWagateClient()
+  const rawFrom = body.from
   const from = await inboundPhone(body, client), to = typeof body.to === 'string' ? normalizePossiblePhone(body.to) : (await ownNumber(client)), text = body.body.trim()
-  const replyTarget = looksLikePhone(from) ? from : (typeof body.from === 'string' && body.from.includes('@') ? body.from : from)
+  const replyTarget = from
   if (!text) return c.json({ ok: true, skipped: 'empty' })
+  if (typeof rawFrom === 'string' && rawFrom.includes('status@broadcast')) return c.json({ ok: true, skipped: 'status-broadcast' })
+  if (!looksLikePhone(from)) return c.json({ ok: true, skipped: 'unresolved-sender' })
   await client.insert<MessageRow>('messages_wagate', { wa_message_id: typeof body.messageId === 'string' ? body.messageId : `in_${crypto.randomUUID()}`, from_number: from, to_number: to, content: text, message_type: 'text', direction: 'inbound', status: 'received' })
   c.executionCtx.waitUntil(
     handleBot(from, replyTarget, text, c.env as RuntimeEnv).catch((error: unknown) => {

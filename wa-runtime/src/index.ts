@@ -133,7 +133,7 @@ function isAuthorized(authHeader: string | undefined): boolean {
 }
 
 async function forwardIncomingMessage(message: WaMessage): Promise<void> {
-  if (message.fromMe || !message.body.trim()) return
+  if (message.fromMe || !message.body.trim() || message.from === 'status@broadcast') return
 
   try {
     const contact = await message.getContact().catch(() => null)
@@ -142,6 +142,8 @@ async function forwardIncomingMessage(message: WaMessage): Promise<void> {
     const chatId = chat?.id?._serialized ?? null
     const contactUser = contact?.id?.server === 'c.us' ? contact.id.user : null
     const chatUser = chat?.id?.server === 'c.us' ? chat.id.user : null
+    const fromServer = message.from.split('@')[1] ?? ''
+    if (fromServer !== 'c.us' && !contactUser && !chatUser) return
     const response = await fetch(`${config.corsOrigin}/api/runtime/incoming`, {
       method: 'POST',
       headers: {

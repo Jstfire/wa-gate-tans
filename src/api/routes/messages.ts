@@ -71,8 +71,8 @@ function contactKey(value: string): string {
 
 function shouldShowContact(value: string, ownNumber: string): boolean {
   if (!value || value === ownNumber || value === 'system' || value === 'status@broadcast') return false
-  if (value.includes('@g.us')) return false
-  return /^62\d{7,15}$/.test(value) || /^\d{12,18}$/.test(value)
+  if (value.includes('@g.us') || value.includes('@lid')) return false
+  return /^62\d{7,15}$/.test(value)
 }
 
 function chatVariants(value: string): string[] {
