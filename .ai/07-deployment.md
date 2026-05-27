@@ -5,7 +5,8 @@
 ### Current production
 - App domain: `https://wa-gate.buseldata.com`
 - Worker: `wa-gate-tans`
-- Latest deployed version ID: `be4b7d00-658a-40f1-beb9-cb17da03175e`
+- Latest deployed version ID: `e8d8b83b-a6c8-4f87-9fec-7cf6407bf599`
+- Previous forced fixed full-screen inbox deploy: `be4b7d00-658a-40f1-beb9-cb17da03175e`
 - Previous Inbox fullscreen restoration deploy: `623bacd9-1d15-423e-aa8d-58de1a494aa3`
 - Previous Inbox pixel-feel refinement deploy: `4eca32bb-6913-4594-bbe5-33c30aaf65c1`
 - Previous functional Inbox actions/no call-video deploy: `613f4de8-7204-429f-abbd-3174e8497b6a`
