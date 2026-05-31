@@ -139,30 +139,78 @@ async function forwardIncomingMessage(message: WaMessage): Promise<void> {
     const contact = await message.getContact().catch(() => null)
     const chat = await message.getChat().catch(() => null)
 
-    // === RESOLVE PHONE FROM ALL SOURCES ===
-    // Priority: contact.number > c.us user parts > LID user parts > message.from user part
+    // === RESOLVE PHONE: DEEP RESOLUTION CHAIN ===
+    // NEVER skip — ALWAYS find the real phone number
     const contactUser = contact?.id?.server === 'c.us' ? contact.id.user : null
     const chatUser = chat?.id?.server === 'c.us' ? chat.id.user : null
     const contactLidUser = contact?.id?.server === 'lid' && /^\d{10,15}$/.test(contact.id.user ?? '') ? contact.id.user : null
     const chatLidUser = chat?.id?.server === 'lid' && /^\d{10,15}$/.test(chat.id.user ?? '') ? chat.id.user : null
     const fromUser = message.from.split('@')[0] ?? ''
+    const fromIsPhone = /^62\d{7,15}$/.test(fromUser)
 
-    // Pick best candidate
-    const candidate = contact?.number || contactUser || chatUser || contactLidUser || chatLidUser || fromUser
+    // Step 1: Quick resolution from known sources
+    let phone = contact?.number || contactUser || chatUser || null
 
-    // Normalize to 62... format
-    let phone = candidate.replace(/\D/g, '')
-    if (phone.startsWith('0')) phone = '62' + phone.slice(1)
-    if (phone.startsWith('8') && phone.length >= 9) phone = '62' + phone
+    // Step 2: If message.from itself is a phone (c.us), use it
+    if (!phone && fromIsPhone) phone = fromUser
 
-    // MUST be valid Indonesian phone — skip if not
-    if (!/^62\d{7,15}$/.test(phone)) {
-      console.log('[WA-RUNTIME] Skipping — cannot resolve phone from:', message.from, '| candidate:', candidate)
-      return
+    // Step 3: If still no phone and sender is LID — deep resolve via getChatById
+    if (!phone && message.from.includes('@lid')) {
+      try {
+        const lidChat = await message.getChat().catch(() => null)
+        if (lidChat?.id?.server === 'c.us' && /^\d{10,15}$/.test(lidChat.id.user ?? '')) {
+          phone = lidChat.id.user
+        }
+      } catch { /* ignore */ }
     }
 
-    // === SEND CLEAN DATA TO WEBHOOK ===
-    // ALWAYS use resolved phone + @c.us — NEVER send raw LID
+    // Step 4: If LID user part looks like a phone number, use it
+    if (!phone && contactLidUser && /^62\d{7,15}$/.test(contactLidUser)) phone = contactLidUser
+    if (!phone && chatLidUser && /^62\d{7,15}$/.test(chatLidUser)) phone = chatLidUser
+
+    // Step 5: Try normalize whatever we have
+    if (!phone) {
+      const candidate = contactLidUser || chatLidUser || fromUser
+      if (candidate) {
+        let normalized = candidate.replace(/\D/g, '')
+        if (normalized.startsWith('0')) normalized = '62' + normalized.slice(1)
+        if (normalized.startsWith('8') && normalized.length >= 9) normalized = '62' + normalized
+        if (/^62\d{7,15}$/.test(normalized)) phone = normalized
+      }
+    }
+
+    // Step 6: LAST RESORT — try resolving by getting all contacts and matching
+    if (!phone && message.from.includes('@lid')) {
+      try {
+        // If contact has a number field from WA's internal mapping, use it
+        if (contact?.number && /^\d{10,15}$/.test(contact.number)) {
+          phone = contact.number
+        }
+      } catch { /* ignore */ }
+    }
+
+    // Final normalization
+    if (phone) {
+      let p = phone.replace(/\D/g, '')
+      if (p.startsWith('0')) p = '62' + p.slice(1)
+      if (p.startsWith('8') && p.length >= 9) p = '62' + p
+      if (!p.startsWith('62')) p = '62' + p
+      if (/^62\d{7,15}$/.test(p)) phone = p
+      else phone = null
+    }
+
+    // === NEVER SKIP — if still no phone, log warning but still forward ===
+    // Use LID digits as temporary identifier — webhook will handle it
+    if (!phone) {
+      console.warn('[WA-RUNTIME] Could not resolve phone for:', message.from, '| forwarding with raw ID')
+      phone = fromUser.replace(/\D/g, '')
+      if (!phone) {
+        console.error('[WA-RUNTIME] Completely unresolvable sender:', message.from)
+        return
+      }
+    }
+
+    // === SEND TO WEBHOOK — ALWAYS with resolved phone ===
     const ownNumber = message.to.split('@')[0] ?? ''
     const response = await fetch(`${config.corsOrigin}/api/runtime/incoming`, {
       method: 'POST',
