@@ -3,13 +3,16 @@
  * Used by route beforeLoad hooks and API call interceptors.
  */
 
-const AUTH_CHECK_INTERVAL_MS = 5 * 60 * 1000
+const AUTH_CHECK_INTERVAL_MS=5 * 60 * 1000
 let lastServerCheck = 0
 let lastServerResult = false
 
 function clearAuth() {
   localStorage.removeItem('wa-gate-token')
   localStorage.removeItem('wa-gate-user')
+  // Also clear server check cache so isAuthenticated() won't return stale true
+  lastServerCheck = 0
+  lastServerResult = false
 }
 
 function isTokenLocallyValid(): boolean {
@@ -30,7 +33,7 @@ async function isTokenServerValid(): Promise<boolean> {
   if (now - lastServerCheck < AUTH_CHECK_INTERVAL_MS && lastServerResult) return true
 
   const token = localStorage.getItem('wa-gate-token')
-  if (!token) return false
+  if (!token) { lastServerResult = false; return false }
 
   try {
     const res = await fetch('/api/auth/verify', {
@@ -47,6 +50,7 @@ async function isTokenServerValid(): Promise<boolean> {
 }
 
 export async function isAuthenticated(): Promise<boolean> {
+  // Always check local token first — if missing/expired, short-circuit
   if (!isTokenLocallyValid()) {
     clearAuth()
     return false

@@ -5,7 +5,8 @@
 ### Current production
 - App domain: `https://wa-gate.buseldata.com`
 - Worker: `wa-gate-tans`
-- Latest deployed version ID: `5b34fc4e-1fee-45fe-ae4c-e7f4295a85e5`
+- Latest deployed version ID: `3c070230-f565-4c1e-bfb0-491f3f9888f1`
+- Previous auth cache stale fix deploy: `5b34fc4e-1fee-45fe-ae4c-e7f4295a85e5`
 - Previous session expiration redirect deploy: `e8d8b83b-a6c8-4f87-9fec-7cf6407bf599`
 - Previous forced fixed full-screen inbox deploy: `be4b7d00-658a-40f1-beb9-cb17da03175e`
 - Previous Inbox fullscreen restoration deploy: `623bacd9-1d15-423e-aa8d-58de1a494aa3`
