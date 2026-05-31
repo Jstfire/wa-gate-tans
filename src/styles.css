@@ -25,48 +25,48 @@ body {
   margin: 0;
 }
 
-/* WhatsApp Web bubble tails */
+/* WhatsApp Web bubble tails - solid filled triangle */
 .wa-tail-sent,
 .wa-tail-received {
   position: relative;
 }
 
-/* Sent bubble: tail at top-right */
+/* Sent bubble: solid triangle at top-right, pointing UP-RIGHT */
 .wa-tail-sent::after {
   content: '';
   position: absolute;
   top: 0;
   right: -8px;
   width: 8px;
-  height: 8px;
-  border-bottom-left-radius: 8px;
-  background: transparent;
+  height: 13px;
 }
 
 .wa-tail-sent.wa-tail-light::after {
-  box-shadow: 2px -2px 0 0 #d9fdd3;
+  background-color: #d9fdd3;
+  clip-path: polygon(0 100%, 100% 0, 100% 100%);
 }
 
 .wa-tail-sent.wa-tail-dark::after {
-  box-shadow: 2px -2px 0 0 #005c4b;
+  background-color: #005c4b;
+  clip-path: polygon(0 100%, 100% 0, 100% 100%);
 }
 
-/* Received bubble: tail at top-left */
+/* Received bubble: solid triangle at top-left, pointing UP-LEFT */
 .wa-tail-received::after {
   content: '';
   position: absolute;
   top: 0;
   left: -8px;
   width: 8px;
-  height: 8px;
-  border-bottom-right-radius: 8px;
-  background: transparent;
+  height: 13px;
 }
 
 .wa-tail-received.wa-tail-light::after {
-  box-shadow: -2px -2px 0 0 white;
+  background-color: white;
+  clip-path: polygon(0 0, 100% 100%, 0 100%);
 }
 
 .wa-tail-received.wa-tail-dark::after {
-  box-shadow: -2px -2px 0 0 #202c33;
+  background-color: #202c33;
+  clip-path: polygon(0 0, 100% 100%, 0 100%);
 }
