@@ -1,11 +1,12 @@
 import { createFileRoute, Outlet, redirect } from '@tanstack/solid-router'
 import { AppLayout } from '../components/layout/app-layout'
+import { isAuthenticated } from '../lib/auth-check'
 
 export const Route = createFileRoute('/_app')({
-  beforeLoad: () => {
+  beforeLoad: async () => {
     if (typeof window === 'undefined') return
-    const token = localStorage.getItem('wa-gate-token')
-    if (!token) {
+    const ok = await isAuthenticated()
+    if (!ok) {
       throw redirect({ to: '/login' })
     }
   },

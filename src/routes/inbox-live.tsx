@@ -1,9 +1,14 @@
 import { createFileRoute, redirect } from '@tanstack/solid-router'
 import { createMemo, createSignal, For, onCleanup, onMount, Show } from 'solid-js'
 import type { JSX } from 'solid-js'
+import { isAuthenticated, handleAuthResponse, resetAuthCache } from '../lib/auth-check'
 
 export const Route = createFileRoute('/inbox-live')({
-  beforeLoad: () => { if (typeof window !== 'undefined' && !localStorage.getItem('wa-gate-token')) throw redirect({ to: '/login' }) },
+  beforeLoad: async () => {
+    if (typeof window === 'undefined') return
+    const ok = await isAuthenticated()
+    if (!ok) throw redirect({ to: '/login' })
+  },
   component: InboxLivePage,
 })
 
@@ -17,7 +22,7 @@ type FormattedSegment = { text: string; bold: boolean; italic: boolean; strike: 
 function tokenHeader(): HeadersInit { const token = typeof window === 'undefined' ? null : localStorage.getItem('wa-gate-token'); return token ? { Authorization: `Bearer ${token}` } : {} }
 function withRealtimeNonce(url: string): string { return `${url}${url.includes('?') ? '&' : '?'}_=${Date.now()}` }
 async function fetchJson<T>(url: string): Promise<T> {
-  const res = await fetch(withRealtimeNonce(url), { headers: { ...tokenHeader(), 'Cache-Control': 'no-cache' }, cache: 'no-store' })
+  const res = handleAuthResponse(await fetch(withRealtimeNonce(url), { headers: { ...tokenHeader(), 'Cache-Control': 'no-cache' }, cache: 'no-store' }))
   if (!res.ok) throw new Error('Gagal memuat data')
   return res.json() as Promise<T>
 }
@@ -133,7 +138,7 @@ function InboxLivePage() {
     setMessages((prev) => [...prev, optimistic])
     setSending(true)
     try {
-      const res = await fetch(withRealtimeNonce('/api/messages/send'), { method: 'POST', headers: { ...tokenHeader(), 'Content-Type': 'application/json', 'Cache-Control': 'no-cache' }, cache: 'no-store', body: JSON.stringify({ to, message: outgoingText }) })
+      const res = handleAuthResponse(await fetch(withRealtimeNonce('/api/messages/send'), { method: 'POST', headers: { ...tokenHeader(), 'Content-Type': 'application/json', 'Cache-Control': 'no-cache' }, cache: 'no-store', body: JSON.stringify({ to, message: outgoingText }) }))
       if (!res.ok) throw new Error('Gagal mengirim pesan')
       const saved = await res.json() as Message
       setMessages((prev) => prev.map((item) => item.id === optimistic.id ? saved : item))

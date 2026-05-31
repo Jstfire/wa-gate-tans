@@ -1,5 +1,6 @@
 import { createContext, useContext, createSignal, onMount  } from 'solid-js'
 import type {JSX} from 'solid-js';
+import { setupGlobalAuthInterceptor, resetAuthCache, handleAuthResponse } from '../lib/auth-check'
 
 export type AuthUser = {
   id: string
@@ -28,15 +29,16 @@ export function AuthProvider(props: { children: JSX.Element }) {
   const isAuthenticated = () => !!user()
 
   onMount(async () => {
+    setupGlobalAuthInterceptor()
     const token = getToken()
     if (!token) {
       setIsLoading(false)
       return
     }
     try {
-      const res = await fetch('/api/auth/me', {
+      const res = handleAuthResponse(await fetch('/api/auth/me', {
         headers: { Authorization: `Bearer ${token}` },
-      })
+      }))
       if (res.ok) {
         const data = (await res.json()) as AuthUser
         setUser(data)
@@ -78,6 +80,7 @@ export function AuthProvider(props: { children: JSX.Element }) {
     }
 
     localStorage.setItem('wa-gate-token', payload.token)
+    resetAuthCache()
     setUser(payload.user)
   }
 
@@ -92,6 +95,7 @@ export function AuthProvider(props: { children: JSX.Element }) {
       } catch { /* ignore */ }
     }
     localStorage.removeItem('wa-gate-token')
+    resetAuthCache()
     setUser(null)
   }
 

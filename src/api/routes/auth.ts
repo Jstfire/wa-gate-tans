@@ -140,6 +140,11 @@ auth.post('/logout', authMiddleware, async (c: ApiContext) => {
   }
 })
 
+auth.get('/verify', authMiddleware, async (c: ApiContext) => {
+  const user = c.get('user')
+  return c.json({ valid: true, id: user.id, username: user.username, roles: user.roles })
+})
+
 auth.get('/me', authMiddleware, async (c: ApiContext) => {
   const user = c.get('user')
   return c.json({ id: user.id, username: user.username, roles: user.roles })
