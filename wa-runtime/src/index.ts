@@ -142,8 +142,13 @@ async function forwardIncomingMessage(message: WaMessage): Promise<void> {
     const chatId = chat?.id?._serialized ?? null
     const contactUser = contact?.id?.server === 'c.us' ? contact.id.user : null
     const chatUser = chat?.id?.server === 'c.us' ? chat.id.user : null
+    // Also extract user part from LID contacts (e.g., 6289616370100@lid → 6289616370100)
+    const contactLidUser = contact?.id?.server === 'lid' && /^\d{10,15}$/.test(contact.id.user ?? '') ? contact.id.user : null
+    const chatLidUser = chat?.id?.server === 'lid' && /^\d{10,15}$/.test(chat.id.user ?? '') ? chat.id.user : null
     const fromServer = message.from.split('@')[1] ?? ''
-    if (fromServer !== 'c.us' && !contactUser && !chatUser) return
+    // Always forward to webhook — let the server decide what to keep/skip
+    // Only skip non-person messages (groups, status, etc.) that have no c.us/lid origin
+    if (fromServer !== 'c.us' && fromServer !== 'lid' && !contactUser && !chatUser) return
     const response = await fetch(`${config.corsOrigin}/api/runtime/incoming`, {
       method: 'POST',
       headers: {
@@ -156,7 +161,7 @@ async function forwardIncomingMessage(message: WaMessage): Promise<void> {
         body: message.body,
         messageId: message.id.id,
         timestamp: message.timestamp,
-        contactNumber: contact?.number ?? contactUser ?? chatUser,
+        contactNumber: contact?.number ?? contactUser ?? chatUser ?? contactLidUser ?? chatLidUser,
         contactName: contact?.pushname ?? contact?.name ?? null,
         contactId,
         chatId,
