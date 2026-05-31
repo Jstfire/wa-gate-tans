@@ -5,7 +5,8 @@
 ### Current production
 - App domain: `https://wa-gate.buseldata.com`
 - Worker: `wa-gate-tans`
-- Latest deployed version ID: `1d1fccf8-f44f-43ea-8e06-7494dda1edbf`
+- Latest deployed version ID: `df09ca77-b05a-457b-995d-6440e26b47dc`
+- Previous bubble tail CSS deploy: `1d1fccf8-f44f-43ea-8e06-7494dda1edbf`
 - Previous WA Web bubble style overhaul deploy: `a8e8ed5a-fa26-4250-91ff-8ae14af06d96`
 - Previous non-JSON runtime response handling deploy: `54ba06f8-81db-44fc-8afa-9795712a93a4`
 - Previous session TTL 1-week deploy: `3c070230-f565-4c1e-bfb0-491f3f9888f1`

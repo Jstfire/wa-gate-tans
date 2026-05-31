@@ -24,3 +24,37 @@ html {
 body {
   margin: 0;
 }
+
+/* WhatsApp Web bubble tails */
+.wa-tail-sent,
+.wa-tail-received {
+  position: relative;
+}
+.wa-tail-sent::after,
+.wa-tail-received::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  width: 8px;
+  height: 13px;
+}
+.wa-tail-sent::after {
+  right: -8px;
+  border-bottom-left-radius: 8px;
+}
+.wa-tail-sent.wa-tail-light::after {
+  box-shadow: -2px 2px 0 0 #d9fdd3;
+}
+.wa-tail-sent.wa-tail-dark::after {
+  box-shadow: -2px 2px 0 0 #005c4b;
+}
+.wa-tail-received::after {
+  left: -8px;
+  border-bottom-right-radius: 8px;
+}
+.wa-tail-received.wa-tail-light::after {
+  box-shadow: 2px 2px 0 0 white;
+}
+.wa-tail-received.wa-tail-dark::after {
+  box-shadow: 2px 2px 0 0 #202c33;
+}
