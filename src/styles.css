@@ -25,46 +25,48 @@ body {
   margin: 0;
 }
 
-/* WhatsApp Web bubble tails */
+/* WhatsApp Web bubble tails - clip-path method */
 .wa-tail-sent,
 .wa-tail-received {
   position: relative;
 }
 
-/* Sent bubble: tail at top-right */
+/* Sent bubble: tail at top-right, pointing UP-RIGHT */
 .wa-tail-sent::after {
   content: '';
   position: absolute;
-  top: 0;
+  top: -1px;
   right: -8px;
-  border-width: 0 8px 8px 0;
-  border-style: solid;
-  border-color: transparent;
+  width: 8px;
+  height: 13px;
+  background-color: #005c4b;
+  clip-path: polygon(0 0, 100% 0, 0 100%);
 }
 
 .wa-tail-sent.wa-tail-light::after {
-  border-right-color: #d9fdd3;
+  background-color: #d9fdd3;
 }
 
 .wa-tail-sent.wa-tail-dark::after {
-  border-right-color: #005c4b;
+  background-color: #005c4b;
 }
 
-/* Received bubble: tail at top-left */
+/* Received bubble: tail at top-left, pointing UP-LEFT */
 .wa-tail-received::after {
   content: '';
   position: absolute;
-  top: 0;
+  top: -1px;
   left: -8px;
-  border-width: 8px 8px 0 0;
-  border-style: solid;
-  border-color: transparent;
+  width: 8px;
+  height: 13px;
+  background-color: #202c33;
+  clip-path: polygon(100% 0, 100% 100%, 0 0);
 }
 
 .wa-tail-received.wa-tail-light::after {
-  border-top-color: white;
+  background-color: white;
 }
 
 .wa-tail-received.wa-tail-dark::after {
-  border-top-color: #202c33;
+  background-color: #202c33;
 }
