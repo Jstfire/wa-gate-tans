@@ -101,7 +101,7 @@ auth.post('/login', async (c) => {
       } catch { roleNames = [] }
     }
 
-    const ttlSeconds = 60 * 60 * 8
+    const ttlSeconds = 60 * 60 * 24 * 7
     const expiresAt = getTokenExpiry(ttlSeconds)
     const sessionId = crypto.randomUUID()
 
@@ -158,7 +158,7 @@ auth.post('/refresh', authMiddleware, async (c: ApiContext) => {
 
     await wagate.delete('sessions_wagate', { token: `eq.${oldToken}` })
 
-    const ttlSeconds = 60 * 60 * 8
+    const ttlSeconds = 60 * 60 * 24 * 7
     const expiresAt = getTokenExpiry(ttlSeconds)
     const sessionId = crypto.randomUUID()
 
