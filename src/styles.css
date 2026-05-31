@@ -31,38 +31,40 @@ body {
   position: relative;
 }
 
-/* Sent bubble: tail at bottom-right */
+/* Sent bubble: tail at top-right */
 .wa-tail-sent::after {
   content: '';
   position: absolute;
-  bottom: 0;
+  top: 0;
   right: -8px;
-  border-width: 0 0 8px 8px;
+  border-width: 0 8px 8px 0;
   border-style: solid;
+  border-color: transparent;
 }
 
 .wa-tail-sent.wa-tail-light::after {
-  border-color: transparent transparent #d9fdd3 transparent;
+  border-right-color: #d9fdd3;
 }
 
 .wa-tail-sent.wa-tail-dark::after {
-  border-color: transparent transparent #005c4b transparent;
+  border-right-color: #005c4b;
 }
 
-/* Received bubble: tail at bottom-left */
+/* Received bubble: tail at top-left */
 .wa-tail-received::after {
   content: '';
   position: absolute;
-  bottom: 0;
+  top: 0;
   left: -8px;
-  border-width: 0 0 8px 8px;
+  border-width: 8px 8px 0 0;
   border-style: solid;
+  border-color: transparent;
 }
 
 .wa-tail-received.wa-tail-light::after {
-  border-color: transparent transparent white transparent;
+  border-top-color: white;
 }
 
 .wa-tail-received.wa-tail-dark::after {
-  border-color: transparent transparent #202c33 transparent;
+  border-top-color: #202c33;
 }
