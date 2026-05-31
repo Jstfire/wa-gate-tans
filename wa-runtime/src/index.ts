@@ -138,17 +138,32 @@ async function forwardIncomingMessage(message: WaMessage): Promise<void> {
   try {
     const contact = await message.getContact().catch(() => null)
     const chat = await message.getChat().catch(() => null)
-    const contactId = contact?.id?._serialized ?? null
-    const chatId = chat?.id?._serialized ?? null
+
+    // === RESOLVE PHONE FROM ALL SOURCES ===
+    // Priority: contact.number > c.us user parts > LID user parts > message.from user part
     const contactUser = contact?.id?.server === 'c.us' ? contact.id.user : null
     const chatUser = chat?.id?.server === 'c.us' ? chat.id.user : null
-    // Also extract user part from LID contacts (e.g., 6289616370100@lid → 6289616370100)
     const contactLidUser = contact?.id?.server === 'lid' && /^\d{10,15}$/.test(contact.id.user ?? '') ? contact.id.user : null
     const chatLidUser = chat?.id?.server === 'lid' && /^\d{10,15}$/.test(chat.id.user ?? '') ? chat.id.user : null
-    const fromServer = message.from.split('@')[1] ?? ''
-    // Always forward to webhook — let the server decide what to keep/skip
-    // Only skip non-person messages (groups, status, etc.) that have no c.us/lid origin
-    if (fromServer !== 'c.us' && fromServer !== 'lid' && !contactUser && !chatUser) return
+    const fromUser = message.from.split('@')[0] ?? ''
+
+    // Pick best candidate
+    const candidate = contact?.number || contactUser || chatUser || contactLidUser || chatLidUser || fromUser
+
+    // Normalize to 62... format
+    let phone = candidate.replace(/\D/g, '')
+    if (phone.startsWith('0')) phone = '62' + phone.slice(1)
+    if (phone.startsWith('8') && phone.length >= 9) phone = '62' + phone
+
+    // MUST be valid Indonesian phone — skip if not
+    if (!/^62\d{7,15}$/.test(phone)) {
+      console.log('[WA-RUNTIME] Skipping — cannot resolve phone from:', message.from, '| candidate:', candidate)
+      return
+    }
+
+    // === SEND CLEAN DATA TO WEBHOOK ===
+    // ALWAYS use resolved phone + @c.us — NEVER send raw LID
+    const ownNumber = message.to.split('@')[0] ?? ''
     const response = await fetch(`${config.corsOrigin}/api/runtime/incoming`, {
       method: 'POST',
       headers: {
@@ -156,15 +171,15 @@ async function forwardIncomingMessage(message: WaMessage): Promise<void> {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        from: message.from,
-        to: message.to,
+        from: phone + '@c.us',
+        to: (/^62\d{7,15}$/.test(ownNumber) ? ownNumber : phone) + '@c.us',
         body: message.body,
         messageId: message.id.id,
         timestamp: message.timestamp,
-        contactNumber: contact?.number ?? contactUser ?? chatUser ?? contactLidUser ?? chatLidUser,
+        contactNumber: phone,
         contactName: contact?.pushname ?? contact?.name ?? null,
-        contactId,
-        chatId,
+        contactId: phone + '@c.us',
+        chatId: phone + '@c.us',
       }),
     })
     if (!response.ok) {
