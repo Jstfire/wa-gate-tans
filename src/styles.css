@@ -25,32 +25,32 @@ body {
   margin: 0;
 }
 
-/* WhatsApp Web bubble tails */
+/* WhatsApp Web bubble tails - BOTTOM corner */
 .wa-tail-sent,
 .wa-tail-received {
   position: relative;
 }
 
-/* Sent bubble: tail at top-right, pointing UP-RIGHT */
+/* Sent bubble: tail at BOTTOM-RIGHT */
 .wa-tail-sent::before {
   content: '';
   position: absolute;
-  top: -1px;
+  bottom: 0;
   right: -8px;
   width: 8px;
   height: 13px;
   background-color: inherit;
-  clip-path: polygon(100% 0, 0 0, 100% 100%);
+  clip-path: polygon(0 100%, 100% 0, 100% 100%);
 }
 
-/* Received bubble: tail at top-left, pointing UP-LEFT */
+/* Received bubble: tail at BOTTOM-LEFT */
 .wa-tail-received::before {
   content: '';
   position: absolute;
-  top: -1px;
+  bottom: 0;
   left: -8px;
   width: 8px;
   height: 13px;
   background-color: inherit;
-  clip-path: polygon(0 0, 100% 0, 0 100%);
+  clip-path: polygon(0 0, 100% 100%, 0 100%);
 }
