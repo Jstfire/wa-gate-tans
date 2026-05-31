@@ -72,9 +72,14 @@ async function runtimeFetchFrom<T>(url: string, key: string, path: string, init:
     const endpoint = path.includes('?') ? `${url}${path}&_=${Date.now()}` : `${url}${path}?_=${Date.now()}`
     const response = await fetch(endpoint, { ...init, headers, signal: controller.signal })
     const text = await response.text()
-    const data = text ? (JSON.parse(text) as T) : ({} as T)
+    let data: T
+    try {
+      data = text ? (JSON.parse(text) as T) : ({} as T)
+    } catch {
+      throw new Error(`${url}: non-JSON response (${response.status} ${response.statusText}): ${text.slice(0, 120)}`)
+    }
     if (!response.ok) {
-      const message = typeof data === 'object' && data && 'error' in data ? String((data as { error?: unknown }).error) : 'WA runtime request failed'
+      const message = typeof data === 'object' && data && 'error' in data ? String((data as { error?: unknown }).error) : `WA runtime request failed (${response.status})`
       throw new Error(`${url}: ${message}`)
     }
     return data
