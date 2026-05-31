@@ -71,8 +71,12 @@ function contactKey(value: string): string {
 
 function shouldShowContact(value: string, ownNumber: string): boolean {
   if (!value || value === ownNumber || value === 'system' || value === 'status@broadcast') return false
-  if (value.includes('@g.us') || value.includes('@lid')) return false
-  return /^62\d{7,15}$/.test(value)
+  if (value.includes('@g.us')) return false
+  // Accept valid Indonesian phone numbers
+  if (/^62\d{7,15}$/.test(value)) return true
+  // Accept LID senders (numeric IDs 10-18 digits that aren't phone numbers)
+  if (/^\d{10,18}$/.test(value) && !value.startsWith('62')) return true
+  return false
 }
 
 function chatVariants(value: string): string[] {

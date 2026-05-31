@@ -132,45 +132,70 @@ function isAuthorized(authHeader: string | undefined): boolean {
   return bearer === config.apiKey
 }
 
+// LID-to-Phone resolution cache — persists across messages in same runtime session
+const lidToPhoneCache = new Map<string, string>()
+
+async function resolveLidToPhone(lid: string, waClient: InstanceType<typeof Client> | null): Promise<string | null> {
+  // Check cache first
+  if (lidToPhoneCache.has(lid)) return lidToPhoneCache.get(lid) ?? null
+
+  const c = waClient || client
+  if (!c) return null
+
+  try {
+    // Search ALL contacts for one that matches this LID
+    const contacts = await c.getContacts()
+    for (const ct of contacts) {
+      // Check if this contact's LID matches
+      if (ct.id?.server === 'lid' && ct.id.user === lid && ct.number && /^\d{10,15}$/.test(ct.number)) {
+        lidToPhoneCache.set(lid, ct.number)
+        console.log('[WA-RUNTIME] LID resolved via contacts:', lid, '→', ct.number)
+        return ct.number
+      }
+    }
+
+    // Try getContactById with LID format
+    const lidContact = await c.getContactById(`${lid}@lid`).catch(() => null)
+    if (lidContact?.number && /^\d{10,15}$/.test(lidContact.number)) {
+      lidToPhoneCache.set(lid, lidContact.number)
+      console.log('[WA-RUNTIME] LID resolved via getContactById:', lid, '→', lidContact.number)
+      return lidContact.number
+    }
+  } catch (err) {
+    console.warn('[WA-RUNTIME] LID resolution error:', err instanceof Error ? err.message : String(err))
+  }
+
+  return null
+}
+
 async function forwardIncomingMessage(message: WaMessage): Promise<void> {
   if (message.fromMe || !message.body.trim() || message.from === 'status@broadcast') return
 
   try {
     const contact = await message.getContact().catch(() => null)
     const chat = await message.getChat().catch(() => null)
-
-    // === RESOLVE PHONE: DEEP RESOLUTION CHAIN ===
-    // NEVER skip — ALWAYS find the real phone number
-    const contactUser = contact?.id?.server === 'c.us' ? contact.id.user : null
-    const chatUser = chat?.id?.server === 'c.us' ? chat.id.user : null
-    const contactLidUser = contact?.id?.server === 'lid' && /^\d{10,15}$/.test(contact.id.user ?? '') ? contact.id.user : null
-    const chatLidUser = chat?.id?.server === 'lid' && /^\d{10,15}$/.test(chat.id.user ?? '') ? chat.id.user : null
     const fromUser = message.from.split('@')[0] ?? ''
-    const fromIsPhone = /^62\d{7,15}$/.test(fromUser)
+    const fromIsLid = message.from.includes('@lid')
 
-    // Step 1: Quick resolution from known sources
-    let phone = contact?.number || contactUser || chatUser || null
+    // === LID-TO-PHONE RESOLUTION ===
+    let phone: string | null = null
 
-    // Step 2: If message.from itself is a phone (c.us), use it
-    if (!phone && fromIsPhone) phone = fromUser
+    // Step 1: Direct sources (most reliable)
+    phone = contact?.number || null
+    if (!phone && contact?.id?.server === 'c.us' && /^\d{10,15}$/.test(contact.id.user ?? '')) phone = contact.id.user
+    if (!phone && chat?.id?.server === 'c.us' && /^\d{10,15}$/.test(chat.id.user ?? '')) phone = chat.id.user
 
-    // Step 3: If still no phone and sender is LID — deep resolve via getChatById
-    if (!phone && message.from.includes('@lid')) {
-      try {
-        const lidChat = await message.getChat().catch(() => null)
-        if (lidChat?.id?.server === 'c.us' && /^\d{10,15}$/.test(lidChat.id.user ?? '')) {
-          phone = lidChat.id.user
-        }
-      } catch { /* ignore */ }
+    // Step 2: If message.from is already a phone
+    if (!phone && !fromIsLid && /^62\d{7,15}$/.test(fromUser)) phone = fromUser
+
+    // Step 3: LID-to-Phone resolution via cache + contact search
+    if (!phone && fromIsLid) {
+      phone = await resolveLidToPhone(fromUser, client)
     }
 
-    // Step 4: If LID user part looks like a phone number, use it
-    if (!phone && contactLidUser && /^62\d{7,15}$/.test(contactLidUser)) phone = contactLidUser
-    if (!phone && chatLidUser && /^62\d{7,15}$/.test(chatLidUser)) phone = chatLidUser
-
-    // Step 5: Try normalize whatever we have
-    if (!phone) {
-      const candidate = contactLidUser || chatLidUser || fromUser
+    // Step 4: Try extracting phone from LID user part (some LIDs contain phone)
+    if (!phone && fromIsLid) {
+      const candidate = contact?.id?.user || chat?.id?.user || fromUser
       if (candidate) {
         let normalized = candidate.replace(/\D/g, '')
         if (normalized.startsWith('0')) normalized = '62' + normalized.slice(1)
@@ -179,17 +204,7 @@ async function forwardIncomingMessage(message: WaMessage): Promise<void> {
       }
     }
 
-    // Step 6: LAST RESORT — try resolving by getting all contacts and matching
-    if (!phone && message.from.includes('@lid')) {
-      try {
-        // If contact has a number field from WA's internal mapping, use it
-        if (contact?.number && /^\d{10,15}$/.test(contact.number)) {
-          phone = contact.number
-        }
-      } catch { /* ignore */ }
-    }
-
-    // Final normalization
+    // Step 5: Final normalization
     if (phone) {
       let p = phone.replace(/\D/g, '')
       if (p.startsWith('0')) p = '62' + p.slice(1)
@@ -199,8 +214,7 @@ async function forwardIncomingMessage(message: WaMessage): Promise<void> {
       else phone = null
     }
 
-    // === NEVER SKIP — if still no phone, log warning but still forward ===
-    // Use LID digits as temporary identifier — webhook will handle it
+    // Step 6: NEVER SKIP — use raw ID as last resort
     if (!phone) {
       console.warn('[WA-RUNTIME] Could not resolve phone for:', message.from, '| forwarding with raw ID')
       phone = fromUser.replace(/\D/g, '')
@@ -208,6 +222,21 @@ async function forwardIncomingMessage(message: WaMessage): Promise<void> {
         console.error('[WA-RUNTIME] Completely unresolvable sender:', message.from)
         return
       }
+    }
+
+    // Log resolution result
+    const resolved = /^62\d{7,15}$/.test(phone)
+    console.log(`[WA-RUNTIME] Forwarding: ${message.from} → ${phone}${resolved ? ' (resolved)' : ' (raw LID)'}`)
+
+    // Store LID-to-phone mapping if resolved
+    if (resolved && fromIsLid) {
+      lidToPhoneCache.set(fromUser, phone)
+      // Also tell the webhook about this mapping
+      void fetch(`${config.corsOrigin}/api/runtime/lid-map`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${config.apiKey}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ lid: fromUser, phone }),
+      }).catch(() => {})
     }
 
     // === SEND TO WEBHOOK — ALWAYS with resolved phone ===

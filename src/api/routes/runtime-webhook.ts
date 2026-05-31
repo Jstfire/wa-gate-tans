@@ -60,7 +60,16 @@ async function inboundPhone(body: IncomingPayload, client: ReturnType<typeof get
   if (looksLikePhone(contact)) return contact
   if (looksLikePhone(contactId)) return contactId
   if (looksLikePhone(chatId)) return chatId
-  void client
+
+  // Try LID-to-phone map in DB
+  const rawFrom = typeof body.from === 'string' ? body.from.replace(/@.*$/, '') : ''
+  if (rawFrom && /^\d{10,18}$/.test(rawFrom)) {
+    try {
+      const mapping = await client.selectOne<{ phone: string }>('lid_phone_map_wagate', { filter: { lid: `eq.${rawFrom}` }, limit: 1 })
+      if (mapping?.phone && looksLikePhone(mapping.phone)) return mapping.phone
+    } catch { /* table might not exist yet */ }
+  }
+
   return from || contactId || chatId || contact || 'unknown'
 }
 function metadataObject(value: JsonValue): JsonObject { return value && typeof value === 'object' && !Array.isArray(value) ? value : {} }
@@ -308,7 +317,9 @@ runtimeWebhook.post('/incoming', async (c) => {
   const replyTarget = from
   if (!text) return c.json({ ok: true, skipped: 'empty' })
   if (typeof rawFrom === 'string' && rawFrom.includes('status@broadcast')) return c.json({ ok: true, skipped: 'status-broadcast' })
-  if (!looksLikePhone(from)) return c.json({ ok: true, skipped: 'unresolved-sender' })
+  // Accept both phone numbers (62...) and LID senders — NEVER skip
+  const sender = looksLikePhone(from) ? from : (from || 'unknown')
+  if (sender === 'unknown') return c.json({ ok: true, skipped: 'no-sender' })
   await client.insert<MessageRow>('messages_wagate', { wa_message_id: typeof body.messageId === 'string' ? body.messageId : `in_${crypto.randomUUID()}`, from_number: from, to_number: to, content: text, message_type: 'text', direction: 'inbound', status: 'received' })
   c.executionCtx.waitUntil(
     handleBot(from, replyTarget, text, c.env as RuntimeEnv).catch((error: unknown) => {
@@ -316,6 +327,26 @@ runtimeWebhook.post('/incoming', async (c) => {
     })
   )
   return c.json({ ok: true, botQueued: true })
+})
+
+runtimeWebhook.post('/lid-map', async (c) => {
+  if (!isAuthorized(c.req.header('Authorization'), c.env as RuntimeEnv)) return c.json({ error: 'Unauthorized' }, 401)
+  let body: { lid?: unknown; phone?: unknown }
+  try { body = await c.req.json() } catch { return c.json({ error: 'Invalid body' }, 400) }
+  const lid = typeof body.lid === 'string' ? body.lid : null
+  const phone = typeof body.phone === 'string' ? body.phone : null
+  if (!lid || !phone || !/^62\d{7,15}$/.test(phone)) return c.json({ error: 'Invalid lid or phone' }, 400)
+  try {
+    const client = getWagateClient()
+    const existing = await client.selectOne<{ id: string }>('lid_phone_map_wagate', { filter: { lid: `eq.${lid}` } })
+    if (existing) await client.update('lid_phone_map_wagate', { phone, updated_at: new Date().toISOString() }, { id: `eq.${existing.id}` })
+    else await client.insert('lid_phone_map_wagate', { lid, phone })
+    return c.json({ ok: true })
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : String(error)
+    console.error('[LID-MAP] Error:', msg)
+    return c.json({ error: 'Failed to store mapping', detail: msg }, 500)
+  }
 })
 
 export default runtimeWebhook
