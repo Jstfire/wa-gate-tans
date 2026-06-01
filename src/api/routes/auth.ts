@@ -102,12 +102,13 @@ auth.post('/login', async (c) => {
       const userRow = userRows[0]
 
       // Verify argon2id hash using hash-wasm (same approach as antrean-pst-tans)
+      // bcryptjs is pure JS — works in CF Workers without WASM
+      // Password must be re-hashed to bcrypt via supabase-fix-verify-password.sql
       let passwordValid = false
       try {
-        // bcryptjs is pure JS — works in CF Workers without WASM
         passwordValid = await compare(password, userRow.password)
       } catch (vErr) {
-        return c.json({ error: 'Invalid credentials', debug: { verifyError: vErr instanceof Error ? vErr.message : String(vErr), hashPrefix: userRow.password?.slice(0, 15) } }, 401)
+        return c.json({ error: 'Invalid credentials', debug: { verifyError: vErr instanceof Error ? vErr.message : String(vErr) } }, 401)
       }
 
       if (!passwordValid) {

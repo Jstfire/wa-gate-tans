@@ -2,6 +2,7 @@ import { defineConfig } from 'vite'
 import { devtools } from '@tanstack/devtools-vite'
 import tailwindcss from '@tailwindcss/vite'
 import { tanstackStart } from '@tanstack/solid-start/plugin/vite'
+import wasm from 'vite-plugin-wasm'
 import solidPlugin from 'vite-plugin-solid'
 import { cloudflare } from '@cloudflare/vite-plugin'
 import type { Plugin } from 'vite'
@@ -87,6 +88,7 @@ export default defineConfig({
   plugins: [
     customWorkerEntry(),
     devtools(),
+    wasm(),
     cloudflare({ viteEnvironment: { name: 'ssr' } }),
     tailwindcss(),
     tanstackStart(),
