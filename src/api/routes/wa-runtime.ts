@@ -46,8 +46,8 @@ function envValue(env: RuntimeEnv | undefined, key: string): string {
 }
 
 function runtimeConfig(env?: RuntimeEnv): { urls: string[]; key: string } {
-  const internal = envValue(env, 'WA_RUNTIME_INTERNAL_URL').replace(/\/+$/, '')
-  const primary = internal || 'https://wa-runtime.buseldata.com'
+  // HARDCODE: always use wa-runtime.buseldata.com, ignore stale tunnel URLs
+  const primary = 'https://wa-runtime.buseldata.com'
   const urls = [primary].filter((url, index, arr): url is string => Boolean(url) && arr.indexOf(url) === index)
   const key = envValue(env, 'WA_RUNTIME_API_KEY')
   if (urls.length === 0 || !key) throw new Error('WA runtime is not configured')
@@ -55,9 +55,9 @@ function runtimeConfig(env?: RuntimeEnv): { urls: string[]; key: string } {
 }
 
 function runtimeEndpoints(env?: RuntimeEnv): { label: string; kind: 'primary' | 'backup'; url: string; fetchUrl: string }[] {
-  const internal = envValue(env, 'WA_RUNTIME_INTERNAL_URL').replace(/\/+$/, '')
+  // HARDCODE: always use wa-runtime.buseldata.com, ignore stale tunnel URLs
   return [
-    { label: 'Primary Windows PC', kind: 'primary', url: 'https://wa-runtime.buseldata.com', fetchUrl: internal || 'https://wa-runtime.buseldata.com' },
+    { label: 'Primary Windows PC', kind: 'primary', url: 'https://wa-runtime.buseldata.com', fetchUrl: 'https://wa-runtime.buseldata.com' },
     { label: 'Backup Koyeb', kind: 'backup', url: 'https://precise-melessa-ipds7415-39519134.koyeb.app', fetchUrl: 'https://precise-melessa-ipds7415-39519134.koyeb.app' },
   ]
 }
