@@ -1,4 +1,5 @@
 import { Hono } from 'hono'
+import { argon2Verify } from 'hash-wasm'
 import { getWagateClient, getIndukClient } from '../../lib/supabase-rest'
 import { signJwt, getTokenExpiry } from '../../lib/jwt'
 import { authMiddleware } from '../middleware/auth'
@@ -68,7 +69,7 @@ auth.post('/login', async (c) => {
       namaPegawai = localAdmin.displayName
       roleNames = [localAdmin.role]
     } else {
-      // 2. Try DB Induk — fetch user and verify password
+      // 2. Try DB Induk — fetch user and verify password with hash-wasm argon2
       const induk = getIndukClient()
       const userRows = await induk.select<{ id: number; username: string; password: string; role_ids: number[] }>(
         'akun_pengguna',
@@ -81,23 +82,12 @@ auth.post('/login', async (c) => {
 
       const userRow = userRows[0]
 
-      // Try RPC first (faster), fallback to direct verification
+      // Verify argon2id hash using hash-wasm (pure WASM, works in CF Workers)
       let passwordValid = false
       try {
-        const rpcResult = await induk.rpc<{ success: boolean; id?: number; username?: string }>('verify_user_password', {
-          args: { p_username: username, p_password: password },
-        })
-        passwordValid = Boolean(rpcResult?.success)
+        passwordValid = await argon2Verify({ password, hash: userRow.password })
       } catch {
-        // RPC failed — try direct pgcrypto verification
-        try {
-          const cryptResult = await induk.rpc<{ result: boolean }>('verify_password_crypt', {
-            args: { p_hash: userRow.password, p_password: password },
-          })
-          passwordValid = Boolean(cryptResult?.result)
-        } catch {
-          passwordValid = false
-        }
+        passwordValid = false
       }
 
       if (!passwordValid) {
@@ -106,13 +96,13 @@ auth.post('/login', async (c) => {
 
       userId = String(userRow.id)
       userUsername = userRow.username ?? username
+      const userRoleIds = userRow.role_ids ?? []
 
       // Get nama_pegawai (non-critical)
       try {
-        const indukClient = getIndukClient()
-        const pegRows = await indukClient.select<{ mst_pegawai?: { nama_pegawai?: string } }>(
+        const pegRows = await induk.select<{ mst_pegawai?: { nama_pegawai?: string } }>(
           'akun_pengguna',
-          { select: 'pegawai_id,mst_pegawai(nama_pegawai)', filter: { id: `eq.${verifyResult.id}` }, limit: 1 }
+          { select: 'pegawai_id,mst_pegawai(nama_pegawai)', filter: { id: `eq.${userRow.id}` }, limit: 1 }
         )
         namaPegawai = pegRows[0]?.mst_pegawai?.nama_pegawai ?? null
       } catch { /* non-critical */ }
