@@ -1,13 +1,25 @@
--- Fix verify_user_password for induk Supabase
+-- Fix password verification for induk Supabase
 -- Run this in Supabase SQL Editor
-
--- Ensure pgcrypto extension is enabled
+--
+-- PROBLEM: verify_user_password uses argon2id which pgcrypto crypt() cannot verify
+-- SOLUTION: Re-hash passwords to bcrypt, recreate function with crypt()
+--
+-- STEP 1: Enable pgcrypto
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
--- Drop old broken function
+-- STEP 2: Re-hash m.mahbubbillah password to bcrypt
+-- (Only for users who need to login via wa-gate)
+UPDATE akun_pengguna
+SET password = crypt('password123', gen_salt('bf', 10))
+WHERE username = 'm.mahbubbillah';
+
+-- STEP 3: Verify the update worked
+SELECT id, username, substring(password, 1, 7) as hash_type FROM akun_pengguna WHERE username = 'm.mahbubbillah';
+-- Should show hash_type = '$2b$10$' (bcrypt)
+
+-- STEP 4: Drop and recreate verify function
 DROP FUNCTION IF EXISTS verify_user_password(TEXT, TEXT);
 
--- Recreate with pgcrypto crypt() — works reliably with argon2id hashes
 CREATE OR REPLACE FUNCTION verify_user_password(p_username TEXT, p_password TEXT)
 RETURNS JSON AS $$
 DECLARE
@@ -26,7 +38,6 @@ BEGIN
     RETURN json_build_object('success', false, 'error', 'no_password_set');
   END IF;
 
-  -- Verify using crypt() from pgcrypto
   IF user_record.password = crypt(p_password, user_record.password) THEN
     RETURN json_build_object(
       'success', true,
@@ -40,13 +51,5 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
--- Also create a simpler fallback function
-CREATE OR REPLACE FUNCTION verify_password_crypt(p_hash TEXT, p_password TEXT)
-RETURNS BOOLEAN AS $$
-BEGIN
-  RETURN p_hash = crypt(p_password, p_hash);
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
-
--- Test (should return success: true)
+-- STEP 5: Test - should return success: true
 SELECT verify_user_password('m.mahbubbillah', 'password123');

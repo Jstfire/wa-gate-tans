@@ -1,5 +1,4 @@
 import { Hono } from 'hono'
-import { argon2Verify } from 'hash-wasm'
 import { getWagateClient, getIndukClient } from '../../lib/supabase-rest'
 import { signJwt, getTokenExpiry } from '../../lib/jwt'
 import { authMiddleware } from '../middleware/auth'
@@ -76,27 +75,30 @@ auth.post('/login', async (c) => {
         { filter: { username: `eq.${username}` }, limit: 1 }
       )
 
+      console.log('[AUTH] userRows count:', userRows.length, 'username:', username)
+      if (userRows.length) {
+        console.log('[AUTH] user found, id:', userRows[0].id, 'hasPassword:', Boolean(userRows[0].password), 'hashPrefix:', userRows[0].password?.slice(0, 10))
+      }
       if (!userRows.length || !userRows[0].password) {
         return c.json({ error: 'Invalid credentials' }, 401)
       }
 
       const userRow = userRows[0]
 
-      // Verify argon2id hash using hash-wasm (pure WASM, works in CF Workers)
-      let passwordValid = false
-      try {
-        passwordValid = await argon2Verify({ password, hash: userRow.password })
-      } catch {
-        passwordValid = false
-      }
+      // Verify password via Supabase RPC (pgcrypto crypt)
+      const verifyResult = await induk.rpc<{ success: boolean; id?: number; username?: string; role_ids?: number[]; error?: string }>('verify_user_password', {
+        args: { p_username: username, p_password: password },
+      })
 
-      if (!passwordValid) {
+      console.log('[AUTH] verify_user_password result:', JSON.stringify(verifyResult))
+
+      if (!verifyResult?.success) {
         return c.json({ error: 'Invalid credentials' }, 401)
       }
 
-      userId = String(userRow.id)
-      userUsername = userRow.username ?? username
-      const userRoleIds = userRow.role_ids ?? []
+      userId = String(verifyResult.id ?? userRow.id)
+      userUsername = verifyResult.username ?? userRow.username ?? username
+      const userRoleIds = verifyResult.role_ids ?? userRow.role_ids ?? []
 
       // Get nama_pegawai (non-critical)
       try {
