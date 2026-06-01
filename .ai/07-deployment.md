@@ -100,3 +100,11 @@ bunx wrangler deploy
 - Continue live QA mobile light/dark.
 - Move Google Drive content folder into Shared Drive and update `GOOGLE_DRIVE_FOLDER_ID`; service-account auth itself is already OK.
 - Scan backup Koyeb QR only if backup failover is required.
+
+### Runtime LID Resolution Update (2026-06-01)
+- Runtime updated with `getContactLidAndPhone()` for LID→phone resolution
+- Origin URL hardcoded to `https://wa-gate.buseldata.com` (prevents stale tunnel URLs)
+- Self-healing watchdog added (60s interval)
+- Windows-compatible paths (`.wwebjs_auth`, `.wwebjs_cache`)
+- wa-gate-runtime commit: `75dc2d5`
+- wa-gate-tans commit: `6effcfa`
