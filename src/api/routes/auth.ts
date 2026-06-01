@@ -1,5 +1,4 @@
 import { Hono } from 'hono'
-import argon2 from 'argon2'
 import { getWagateClient, getIndukClient } from '../../lib/supabase-rest'
 import { signJwt, getTokenExpiry } from '../../lib/jwt'
 import { authMiddleware } from '../middleware/auth'
@@ -69,7 +68,7 @@ auth.post('/login', async (c) => {
       namaPegawai = localAdmin.displayName
       roleNames = [localAdmin.role]
     } else {
-      // 2. Try DB Induk — fetch user and verify password with argon2
+      // 2. Try DB Induk — fetch user and verify password
       const induk = getIndukClient()
       const userRows = await induk.select<{ id: number; username: string; password: string; role_ids: number[] }>(
         'akun_pengguna',
@@ -81,7 +80,26 @@ auth.post('/login', async (c) => {
       }
 
       const userRow = userRows[0]
-      const passwordValid = await argon2.verify(userRow.password, password).catch(() => false)
+
+      // Try RPC first (faster), fallback to direct verification
+      let passwordValid = false
+      try {
+        const rpcResult = await induk.rpc<{ success: boolean; id?: number; username?: string }>('verify_user_password', {
+          args: { p_username: username, p_password: password },
+        })
+        passwordValid = Boolean(rpcResult?.success)
+      } catch {
+        // RPC failed — try direct pgcrypto verification
+        try {
+          const cryptResult = await induk.rpc<{ result: boolean }>('verify_password_crypt', {
+            args: { p_hash: userRow.password, p_password: password },
+          })
+          passwordValid = Boolean(cryptResult?.result)
+        } catch {
+          passwordValid = false
+        }
+      }
+
       if (!passwordValid) {
         return c.json({ error: 'Invalid credentials' }, 401)
       }
