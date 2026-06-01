@@ -146,3 +146,10 @@
 - Scan QR on backup Koyeb only if backup failover needs to be fully active.
 - 4-view visual QA: desktop dark/light passed; mobile dark passed; mobile light needs manual/clean-session recheck.
 - QA WA Blast dispatcher with real 2–3 allowed-history recipients only when safe; current production has no active queued/running blast job.
+
+## Status Terkini (2026-06-01)
+- DB bersih: semua pesan & kontak pakai nomor 62... (0 LID)
+- Webhook: normalisasi LID→phone di sendAndLog dan inbound insert
+- Runtime: getContactLidAndPhone + hardcoded origin + watchdog (perlu restart Windows)
+- Inbox UI: bubble tail benar, full-screen, formatting WA
+- Runtime 502: Windows runtime belum restart dengan kode baru
