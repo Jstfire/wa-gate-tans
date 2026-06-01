@@ -30,6 +30,7 @@
     "@tanstack/solid-router-ssr-query": "latest",
     "@tanstack/solid-start": "latest",
     "@tanstack/solid-table": "^8.21.3",
+    "argon2": "^0.44.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "corvu": "^0.7.2",
