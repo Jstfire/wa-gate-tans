@@ -108,3 +108,8 @@ bunx wrangler deploy
 - Windows-compatible paths (`.wwebjs_auth`, `.wwebjs_cache`)
 - wa-gate-runtime commit: `75dc2d5`
 - wa-gate-tans commit: `6effcfa`
+
+### Cloudflare Token Issue (2026-06-01)
+- Old CLOUDFLARE_API_TOKEN expired/insufficient permissions (error 9106)
+- Updated SUPABASE_INDUK_URL and SUPABASE_INDUK_SERVICE_ROLE_KEY secrets via wrangler
+- Need new token with Workers deploy permission to redeploy
