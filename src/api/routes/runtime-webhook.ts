@@ -168,6 +168,11 @@ async function sendAndLog(to: string, text: string, env?: RuntimeEnv): Promise<v
   const client = getWagateClient()
   let success = false
   let msgId = `bot_${crypto.randomUUID()}`
+  // Normalize to_number: strip @lid/@c.us, ensure 62... format
+  let logTo = to.replace(/@.*$/, '').replace(/\D/g, '')
+  if (logTo.startsWith('0')) logTo = '62' + logTo.slice(1)
+  if (logTo.startsWith('8') && logTo.length >= 9) logTo = '62' + logTo
+  if (!logTo.startsWith('62') || !/^\d{10,15}$/.test(logTo)) logTo = to
   try {
     const sent = await sendViaRuntime(to, text, env)
     success = sent.success
@@ -175,7 +180,7 @@ async function sendAndLog(to: string, text: string, env?: RuntimeEnv): Promise<v
   } catch (error) {
     console.error('[BOT] sendViaRuntime failed:', error instanceof Error ? error.message : error)
   }
-  await client.insert<MessageRow>('messages_wagate', { wa_message_id: msgId, from_number: await ownNumber(client), to_number: to, content: text, message_type: 'text', direction: 'outbound', status: success ? 'sent' : 'failed', is_from_bot: true })
+  await client.insert<MessageRow>('messages_wagate', { wa_message_id: msgId, from_number: await ownNumber(client), to_number: logTo, content: text, message_type: 'text', direction: 'outbound', status: success ? 'sent' : 'failed', is_from_bot: true })
 }
 async function notifyAdmins(fromPhone: string, msgText: string, env?: RuntimeEnv): Promise<void> {
   const client = getWagateClient()
@@ -314,13 +319,18 @@ runtimeWebhook.post('/incoming', async (c) => {
   const client = getWagateClient()
   const rawFrom = body.from
   const from = await inboundPhone(body, client), to = typeof body.to === 'string' ? normalizePossiblePhone(body.to) : (await ownNumber(client)), text = body.body.trim()
-  const replyTarget = from
+  const replyTarget = looksLikePhone(from) ? from : (from || 'unknown')
   if (!text) return c.json({ ok: true, skipped: 'empty' })
   if (typeof rawFrom === 'string' && rawFrom.includes('status@broadcast')) return c.json({ ok: true, skipped: 'status-broadcast' })
   // Accept both phone numbers (62...) and LID senders — NEVER skip
   const sender = looksLikePhone(from) ? from : (from || 'unknown')
   if (sender === 'unknown') return c.json({ ok: true, skipped: 'no-sender' })
-  await client.insert<MessageRow>('messages_wagate', { wa_message_id: typeof body.messageId === 'string' ? body.messageId : `in_${crypto.randomUUID()}`, from_number: from, to_number: to, content: text, message_type: 'text', direction: 'inbound', status: 'received' })
+  // Normalize from_number for DB storage
+  let logFrom = from.replace(/@.*$/, '').replace(/\D/g, '')
+  if (logFrom.startsWith('0')) logFrom = '62' + logFrom.slice(1)
+  if (logFrom.startsWith('8') && logFrom.length >= 9) logFrom = '62' + logFrom
+  if (!logFrom.startsWith('62') || !/^\d{10,15}$/.test(logFrom)) logFrom = from
+  await client.insert<MessageRow>('messages_wagate', { wa_message_id: typeof body.messageId === 'string' ? body.messageId : `in_${crypto.randomUUID()}`, from_number: logFrom, to_number: to, content: text, message_type: 'text', direction: 'inbound', status: 'received' })
   c.executionCtx.waitUntil(
     handleBot(from, replyTarget, text, c.env as RuntimeEnv).catch((error: unknown) => {
       console.error('[BOT] async handler failed:', error instanceof Error ? error.message : error)
