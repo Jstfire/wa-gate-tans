@@ -1,4 +1,5 @@
 import { Hono } from 'hono'
+import { compare } from 'bcryptjs'
 import { getWagateClient, getIndukClient } from '../../lib/supabase-rest'
 import { signJwt, getTokenExpiry } from '../../lib/jwt'
 import { authMiddleware } from '../middleware/auth'
@@ -40,6 +41,22 @@ async function tryLocalAdminLogin(username: string, password: string): Promise<{
   }
 }
 
+auth.get('/debug-induk', async (c) => {
+  try {
+    const induk = getIndukClient()
+    const rows = await induk.select<{ id: number; username: string; password: string }>(
+      'akun_pengguna',
+      { select: 'id,username,password', filter: { username: 'eq.m.mahbubbillah' }, limit: 1 }
+    )
+    if (rows.length) {
+      return c.json({ ok: true, found: true, id: rows[0].id, username: rows[0].username, hasPassword: Boolean(rows[0].password), hashPrefix: rows[0].password?.slice(0, 15), hashLen: rows[0].password?.length })
+    }
+    return c.json({ ok: true, found: false })
+  } catch (err) {
+    return c.json({ ok: false, error: err instanceof Error ? err.message : String(err) })
+  }
+})
+
 auth.post('/login', async (c) => {
   let body: LoginRequest
   try {
@@ -72,33 +89,34 @@ auth.post('/login', async (c) => {
       const induk = getIndukClient()
       const userRows = await induk.select<{ id: number; username: string; password: string; role_ids: number[] }>(
         'akun_pengguna',
-        { filter: { username: `eq.${username}` }, limit: 1 }
+        { select: 'id,username,password,role_ids', filter: { username: `eq.${username}` }, limit: 1 }
       )
 
-      console.log('[AUTH] userRows count:', userRows.length, 'username:', username)
-      if (userRows.length) {
-        console.log('[AUTH] user found, id:', userRows[0].id, 'hasPassword:', Boolean(userRows[0].password), 'hashPrefix:', userRows[0].password?.slice(0, 10))
-      }
+      console.log('[AUTH] induk select result:', userRows.length, 'rows, first:', userRows[0] ? { id: userRows[0].id, user: userRows[0].username, hasPw: Boolean(userRows[0].password), pwLen: userRows[0].password?.length } : 'none')
+
       if (!userRows.length || !userRows[0].password) {
+        console.log('[AUTH] No user or no password found')
         return c.json({ error: 'Invalid credentials' }, 401)
       }
 
       const userRow = userRows[0]
 
-      // Verify password via Supabase RPC (pgcrypto crypt)
-      const verifyResult = await induk.rpc<{ success: boolean; id?: number; username?: string; role_ids?: number[]; error?: string }>('verify_user_password', {
-        args: { p_username: username, p_password: password },
-      })
-
-      console.log('[AUTH] verify_user_password result:', JSON.stringify(verifyResult))
-
-      if (!verifyResult?.success) {
-        return c.json({ error: 'Invalid credentials' }, 401)
+      // Verify argon2id hash using hash-wasm (same approach as antrean-pst-tans)
+      let passwordValid = false
+      try {
+        // bcryptjs is pure JS — works in CF Workers without WASM
+        passwordValid = await compare(password, userRow.password)
+      } catch (vErr) {
+        return c.json({ error: 'Invalid credentials', debug: { verifyError: vErr instanceof Error ? vErr.message : String(vErr), hashPrefix: userRow.password?.slice(0, 15) } }, 401)
       }
 
-      userId = String(verifyResult.id ?? userRow.id)
-      userUsername = verifyResult.username ?? userRow.username ?? username
-      const userRoleIds = verifyResult.role_ids ?? userRow.role_ids ?? []
+      if (!passwordValid) {
+        return c.json({ error: 'Invalid credentials', debug: { userFound: true, hashPrefix: userRow.password?.slice(0, 15), hashLen: userRow.password?.length, verifyResult: passwordValid } }, 401)
+      }
+
+      userId = String(userRow.id)
+      userUsername = userRow.username ?? username
+      const userRoleIds = userRow.role_ids ?? []
 
       // Get nama_pegawai (non-critical)
       try {
