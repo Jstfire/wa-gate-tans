@@ -1,5 +1,4 @@
 import { Hono } from 'hono'
-import { compare } from 'bcryptjs'
 import { getWagateClient, getIndukClient } from '../../lib/supabase-rest'
 import { signJwt, getTokenExpiry } from '../../lib/jwt'
 import { authMiddleware } from '../middleware/auth'
@@ -101,23 +100,17 @@ auth.post('/login', async (c) => {
 
       const userRow = userRows[0]
 
-      // Verify argon2id hash using hash-wasm (same approach as antrean-pst-tans)
-      // bcryptjs is pure JS — works in CF Workers without WASM
-      // Password must be re-hashed to bcrypt via supabase-fix-verify-password.sql
-      let passwordValid = false
-      try {
-        passwordValid = await compare(password, userRow.password)
-      } catch (vErr) {
-        return c.json({ error: 'Invalid credentials', debug: { verifyError: vErr instanceof Error ? vErr.message : String(vErr) } }, 401)
+      // Verify password via Supabase RPC (pgcrypto crypt)
+      const verifyResult = await induk.rpc<{ success: boolean; id?: number; username?: string; role_ids?: number[] }>('verify_user_password', {
+        args: { p_username: username, p_password: password },
+      })
+
+      if (!verifyResult?.success) {
+        return c.json({ error: 'Invalid credentials' }, 401)
       }
 
-      if (!passwordValid) {
-        return c.json({ error: 'Invalid credentials', debug: { userFound: true, hashPrefix: userRow.password?.slice(0, 15), hashLen: userRow.password?.length, verifyResult: passwordValid } }, 401)
-      }
-
-      userId = String(userRow.id)
-      userUsername = userRow.username ?? username
-      const userRoleIds = userRow.role_ids ?? []
+      userId = String(verifyResult.id ?? userRow.id)
+      userUsername = verifyResult.username ?? userRow.username ?? username
 
       // Get nama_pegawai (non-critical)
       try {
