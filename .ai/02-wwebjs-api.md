@@ -1,0 +1,177 @@
+# whatsapp-web.js v1.34.7 API Reference
+
+## Client Methods (43)
+- `getContactLidAndPhone(userIds)` → `Array of {lid: string, pn: string}` — **LID→phone resolver**
+- `getContactById(contactId)` → `Contact`
+- `getContacts()` → `Array of Contact`
+- `getContactDeviceCount(userId)` → `number`
+- `getNumberId(number)` → `Object or null`
+- `getCountryCode(number)` → `string`
+- `getFormattedNumber(number)` → `string`
+- `getProfilePicUrl(contactId)` → `string`
+- `isRegisteredUser(id)` → `Boolean`
+- `getWWebVersion()` → `string`
+- `getState()` → state
+- `getChatById(chatId)` → `Chat`
+- `getChats()` → `Array of Chat`
+- `getMessageById(messageId)` → `Message`
+- `sendMessage(chatId, content)` → `Message`
+- `searchMessages(query)` → `Array of Message`
+- `sendSeen(chatId)` → `boolean`
+- `sendReaction(messageId, reaction)` → void
+- `muteChat(chatId, unmuteDate)` → `{isMuted, muteExpiration}`
+- `unmuteChat(chatId)` → `{isMuted, muteExpiration}`
+- `pinChat()` → `boolean`
+- `unpinChat()` → `boolean`
+- `archiveChat()` → `boolean`
+- `unarchiveChat()` → `boolean`
+- `deleteAddressbookContact(phoneNumber)` → void
+- `saveOrEditAddressbookContact(phoneNumber, firstName, lastName)` → void
+- `setDisplayName(displayName)` → `Boolean`
+- `setProfilePicture(media)` → `boolean`
+- `deleteProfilePicture()` → `boolean`
+- `requestPairingCode(phoneNumber)` → `string`
+- `syncHistory(chatId)` → `boolean`
+- `setBackgroundSync(flag)` → `boolean`
+- `acceptInvite(inviteCode)` → `string`
+- `acceptGroupV4Invite(inviteInfo)` → `Object`
+- `getCommonGroups(contactId)` → `Array of ChatId`
+- `addOrRemoveLabels(labelIds, chatIds)` → void
+- `addOrEditCustomerNote(userId, note)` → void
+- `getCustomerNote(userId)` → `{chatId, content, createdAt, id, modifiedAt, type}`
+- `createCallLink(startTime, callType)` → `string`
+
+## Client Events (27)
+- `qr` — QR code for auth
+- `ready` — Client ready
+- `authenticated` — Authenticated
+- `auth_failure` — Auth failed
+- `disconnected` — Disconnected
+- `message` — Incoming message
+- `message_create` — Any message created (incoming + outgoing)
+- `message_ack` — Message ack changed
+- `message_edit` — Message edited
+- `message_reaction` — Reaction added
+- `message_revoke_everyone` — Message deleted for everyone
+- `message_revoke_me` — Message deleted for me
+- `message_ciphertext` — Ciphertext message
+- `message_ciphertext_failed` — Ciphertext decode failed
+- `media_uploaded` — Media uploaded
+- `contact_changed` — Contact changed
+- `group_join` — Member joined group
+- `group_leave` — Member left group
+- `group_update` — Group updated
+- `group_admin_changed` — Admin changed
+- `group_membership_request` — Membership request
+- `incoming_call` — Incoming call
+- `change_state` — State changed
+- `change_battery` — Battery changed
+- `chat_archived` — Chat archived
+- `chat_removed` — Chat removed
+- `code` — Pairing code
+- `vote_update` — Poll vote update
+
+## Contact Properties
+- `id` — Contact ID (has `_serialized`, `server`, `user`)
+- `name` — Contact name
+- `number` — Phone number (KEY for LID resolution)
+- `pushname` — WhatsApp push name
+- `shortName` — Short name
+- `isBlocked` — Is blocked
+- `isBusiness` — Is business account
+- `isEnterprise` — Is enterprise account
+- `isGroup` — Is group
+- `isMe` — Is self
+- `isMyContact` — Is in address book
+- `isUser` — Is user
+- `isWAContact` — Is WhatsApp contact
+
+## Contact Methods
+- `block()` → `boolean`
+- `unblock()` → `boolean`
+- `getAbout()` → `string|null`
+- `getChat()` → `Chat`
+- `getCommonGroups()` → `Array of ChatId`
+- `getCountryCode()` → `string`
+- `getFormattedNumber()` → `string`
+- `getProfilePicUrl()` → `string`
+
+## Message Properties (55)
+- `id` — Message ID (has `_serialized`)
+- `from` — Sender (e.g. `628xxx@c.us` or `xxx@lid`)
+- `to` — Recipient
+- `body` — Message text
+- `type` — Message type (chat, image, video, etc.)
+- `timestamp` — Unix timestamp
+- `fromMe` — Is from self
+- `author` — Author (for groups)
+- `ack` — Ack status (-1=error, 0=pending, 1=sent, 2=delivered, 3=read, 4=played)
+- `hasMedia` — Has media
+- `hasQuotedMsg` — Has quoted message
+- `isForwarded` — Is forwarded
+- `isStarred` — Is starred
+- `isStatus` — Is status message
+- `isEphemeral` — Is ephemeral
+- `broadcast` — Is broadcast
+- `deviceType` — Device type
+- `duration` — Duration (for voice/video)
+- `links` — Links in message
+- `location` — Location data
+- `mentionedIds` — Mentioned contact IDs
+- `vCards` — vCards
+
+## Message Methods
+- `reply(content)` → `Message`
+- `forward(chat)` → void
+- `delete()` → void
+- `edit(newBody)` → void
+- `star()` → void
+- `unstar()` → void
+- `pin(duration)` → `boolean`
+- `unpin()` → `boolean`
+- `react(reaction)` → void
+- `downloadMedia()` → media
+- `getChat()` → `Chat`
+- `getContact()` → `Contact`
+- `getQuotedMessage()` → `Message`
+- `getMentions()` → `Array of Contact`
+- `getReactions()` → reactions
+- `getPollVotes()` → votes
+- `getInfo()` → info
+- `reload()` → `Message`
+
+## Chat Properties (34)
+- `id` — Chat ID
+- `name` — Chat name
+- `isGroup` — Is group
+- `isMuted` — Is muted
+- `isReadOnly` — Is read-only
+- `unreadCount` — Unread count
+- `timestamp` — Last message timestamp
+- `pinned` — Is pinned
+- `archived` — Is archived
+- `lastMessage` — Last message
+
+## Chat Methods (11)
+- `sendMessage(content)` → `Message`
+- `sendSeen()` → `boolean`
+- `sendStateTyping()` → typing indicator
+- `sendStateRecording()` → recording indicator
+- `clearState()` → clear indicator
+- `fetchMessages(options)` → `Array of Message`
+- `clearMessages()` → `boolean`
+- `delete()` → `boolean`
+- `mute(unmuteDate)` → `{isMuted, muteExpiration}`
+- `unmute()` → `{isMuted, muteExpiration}`
+- `pin()` → `boolean`
+- `unpin()` → `boolean`
+- `archive()` → `boolean`
+- `unarchive()` → `boolean`
+- `markUnread()` → void
+- `syncHistory()` → `boolean`
+- `getContact()` → `Contact`
+- `getLabels()` → labels
+- `changeLabels(labelIds)` → void
+- `getPinnedMessages()` → messages
+- `addOrEditCustomerNote(note)` → void
+- `getCustomerNote()` → note
