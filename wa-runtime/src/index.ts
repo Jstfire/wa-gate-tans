@@ -55,6 +55,7 @@ const state: RuntimeState = {
 }
 
 let client: InstanceType<typeof Client> | null = null
+let watchdogTimer: ReturnType<typeof setInterval> | null = null
 let initializing: Promise<void> | null = null
 
 const SendSchema = z.object({
@@ -73,9 +74,9 @@ function loadConfig(): RuntimeConfig {
   return {
     port: Number.isFinite(port) ? port : 8787,
     apiKey,
-    authDataPath: process.env.WWEBJS_AUTH_PATH ?? '/data/wwebjs_auth',
-    cachePath: process.env.WWEBJS_CACHE_PATH ?? '/data/wwebjs_cache',
-    corsOrigin: process.env.WA_GATE_ORIGIN ?? 'https://wa-gate.buseldata.com',
+    authDataPath: process.env.WWEBJS_AUTH_PATH ?? '.wwebjs_auth',
+    cachePath: process.env.WWEBJS_CACHE_PATH ?? '.wwebjs_cache',
+    corsOrigin: 'https://wa-gate.buseldata.com',
     autoStart: (process.env.WA_RUNTIME_AUTO_START ?? 'true') === 'true',
   }
 }
@@ -135,36 +136,56 @@ function isAuthorized(authHeader: string | undefined): boolean {
 // LID-to-Phone resolution cache — persists across messages in same runtime session
 const lidToPhoneCache = new Map<string, string>()
 
-async function resolveLidToPhone(lid: string, waClient: InstanceType<typeof Client> | null): Promise<string | null> {
-  // Check cache first
+async function resolveLidToPhone(lid: string): Promise<string | null> {
   if (lidToPhoneCache.has(lid)) return lidToPhoneCache.get(lid) ?? null
-
-  const c = waClient || client
-  if (!c) return null
+  if (!client || (state.status !== 'connected' && state.status !== 'authenticated')) return null
 
   try {
-    // Search ALL contacts for one that matches this LID
-    const contacts = await c.getContacts()
-    for (const ct of contacts) {
-      // Check if this contact's LID matches
-      if (ct.id?.server === 'lid' && ct.id.user === lid && ct.number && /^\d{10,15}$/.test(ct.number)) {
-        lidToPhoneCache.set(lid, ct.number)
-        console.log('[WA-RUNTIME] LID resolved via contacts:', lid, '→', ct.number)
-        return ct.number
+    // PRIMARY: getContactLidAndPhone
+    const results = await withTimeout(
+      client.getContactLidAndPhone([lid]),
+      10_000,
+      'getContactLidAndPhone'
+    ).catch(() => [])
+
+    if (Array.isArray(results)) {
+      for (const entry of results) {
+        if (entry?.pn && /^\d{10,15}$/.test(entry.pn)) {
+          let phone = entry.pn
+          if (phone.startsWith('0')) phone = '62' + phone.slice(1)
+          if (phone.startsWith('8') && phone.length >= 9) phone = '62' + phone
+          if (!phone.startsWith('62')) phone = '62' + phone
+          if (/^62\d{7,15}$/.test(phone)) {
+            lidToPhoneCache.set(lid, phone)
+            console.log('[WA-RUNTIME] LID resolved via getContactLidAndPhone:', lid, '->', phone)
+            return phone
+          }
+        }
       }
     }
 
-    // Try getContactById with LID format
-    const lidContact = await c.getContactById(`${lid}@lid`).catch(() => null)
+    // FALLBACK: getContactById
+    const lidContact = await withTimeout(
+      client.getContactById(lid + '@lid'),
+      8_000,
+      'getContactById'
+    ).catch(() => null)
     if (lidContact?.number && /^\d{10,15}$/.test(lidContact.number)) {
-      lidToPhoneCache.set(lid, lidContact.number)
-      console.log('[WA-RUNTIME] LID resolved via getContactById:', lid, '→', lidContact.number)
-      return lidContact.number
+      let phone = lidContact.number
+      if (phone.startsWith('0')) phone = '62' + phone.slice(1)
+      if (phone.startsWith('8') && phone.length >= 9) phone = '62' + phone
+      if (!phone.startsWith('62')) phone = '62' + phone
+      if (/^62\d{7,15}$/.test(phone)) {
+        lidToPhoneCache.set(lid, phone)
+        console.log('[WA-RUNTIME] LID resolved via getContactById:', lid, '->', phone)
+        return phone
+      }
     }
+
+    console.warn('[WA-RUNTIME] LID NOT resolved:', lid)
   } catch (err) {
     console.warn('[WA-RUNTIME] LID resolution error:', err instanceof Error ? err.message : String(err))
   }
-
   return null
 }
 
@@ -190,7 +211,7 @@ async function forwardIncomingMessage(message: WaMessage): Promise<void> {
 
     // Step 3: LID-to-Phone resolution via cache + contact search
     if (!phone && fromIsLid) {
-      phone = await resolveLidToPhone(fromUser, client)
+      phone = await resolveLidToPhone(fromUser)
     }
 
     // Step 4: Try extracting phone from LID user part (some LIDs contain phone)
@@ -412,6 +433,43 @@ function scheduleReconnect(): void {
   }, delayMs)
 }
 
+
+// ============================================================
+// SELF-HEALING WATCHDOG — checks every 60s
+// ============================================================
+function startWatchdog(): void {
+  if (watchdogTimer) clearInterval(watchdogTimer)
+  watchdogTimer = setInterval(async () => {
+    const now = Date.now()
+    const lastEvent = state.lastEventAt ? new Date(state.lastEventAt).getTime() : 0
+    const staleMinutes = (now - lastEvent) / 60_000
+
+    if (state.status === 'connected' && staleMinutes > 10) {
+      console.warn('[WA-RUNTIME] Watchdog: no events for ' + Math.round(staleMinutes) + 'min, checking health...')
+      try {
+        const waState = await withTimeout(client!.getState(), 10_000, 'getState')
+        if (waState !== 'CONNECTED') {
+          console.warn('[WA-RUNTIME] Watchdog: state is', waState, '— reconnecting')
+          touch('error')
+          await destroyClient()
+          await ensureClient()
+        }
+      } catch {
+        console.warn('[WA-RUNTIME] Watchdog: getState failed — reconnecting')
+        touch('error')
+        await destroyClient()
+        await ensureClient()
+      }
+    }
+
+    if (state.status === 'error' || state.status === 'disconnected') {
+      console.warn('[WA-RUNTIME] Watchdog: status is ' + state.status + ' — attempting reconnect')
+      await destroyClient()
+      await ensureClient().catch(() => {})
+    }
+  }, 60_000)
+}
+
 async function sendHumanLike(to: string, message: string, simulateTyping: boolean): Promise<SendResult> {
   if (!client || (state.status !== 'connected' && state.status !== 'authenticated')) {
     throw new Error('WA client is not connected')
@@ -524,6 +582,7 @@ serve({ fetch: app.fetch, port: config.port })
 console.log(`[WA-RUNTIME] Listening on :${config.port}`)
 
 if (config.autoStart) {
+  startWatchdog()
   ensureClient().catch((err: unknown) => {
     state.lastError = err instanceof Error ? err.message : 'Startup failed'
     touch('error')
