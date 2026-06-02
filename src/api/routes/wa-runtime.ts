@@ -55,9 +55,10 @@ function runtimeConfig(env?: RuntimeEnv): { urls: string[]; key: string } {
 }
 
 function runtimeEndpoints(env?: RuntimeEnv): { label: string; kind: 'primary' | 'backup'; url: string; fetchUrl: string }[] {
-  // HARDCODE: always use wa-runtime.buseldata.com, ignore stale tunnel URLs
+  const tunnelUrl = envValue(env, 'RUNTIME_TUNNEL_URL').replace(/\/+$/, '')
+  const primaryUrl = tunnelUrl || 'https://wa-runtime.buseldata.com'
   return [
-    { label: 'Primary Windows PC', kind: 'primary', url: 'https://wa-runtime.buseldata.com', fetchUrl: 'https://wa-runtime.buseldata.com' },
+    { label: 'Primary Windows PC', kind: 'primary', url: primaryUrl, fetchUrl: primaryUrl },
     { label: 'Backup Koyeb', kind: 'backup', url: 'https://precise-melessa-ipds7415-39519134.koyeb.app', fetchUrl: 'https://precise-melessa-ipds7415-39519134.koyeb.app' },
   ]
 }
